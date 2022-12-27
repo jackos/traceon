@@ -1,10 +1,10 @@
 # Traceon - trace on json
-A simple log and trace formatter with a structured json output, it flattens events from nested spans
-and simply overwrites the parent if required.
+A simple log and trace formatter with a structured json output, it flattens events from nested spans,
+overriding the parent if required.
 
-The `tracing` library is difficult to understand initially, this crate is designed to be as easy
+The `tracing` crate is difficult to understand initially, this crate is designed to be as easy
 to use as possible with sensible defaults and configuration options. It should only be used from 
-a binary, don't use in libray code as it sets the default subscriber which could cause conflicts 
+a binary, don't use in library code as it sets the default subscriber which could cause conflicts 
 for users.
 
 The only two crates you'll need in your `Cargo.toml` are:
@@ -21,19 +21,16 @@ and run commands like:
 cargo run | jq -R 'fromjson?'
 ```
 
-By default `env-filter` is used at the `info` level, there is a large amount of filter options
-available [detailed here](https://docs.rs/env_logger/latest/env_logger/) via an environment variable
-for example `RUST_LOG=warn`
+By default `env-filter` is used at the `info` level, to change the level see options [detailed here](https://docs.rs/env_logger/latest/env_logger/) for example `RUST_LOG=warn`
 
-This library uses code originated from: 
+This crate uses code originated from: 
 [LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter)
 which is great for [bunyan formatting](https://www.npmjs.com/package/bunyan-format)
 
-
 ## Examples
 
-### Simple
-There are some useful fields included by default that can be turned off:
+### Simple Example
+The fields output below are defaults that can be turned off:
 ```rust
 fn main() {
     traceon::on();
@@ -61,7 +58,7 @@ error: 50
 
 ### \#\[instrument\] macro
 If you're using normal functions or `async`, you can use the `tracing::instrument` macro to capture
-the paremeters for each function call:
+the parameters for each function call:
 
 ```rust
 #[tracing::instrument]
@@ -89,8 +86,7 @@ async fn main() {
 ```
 
 ### Instrument trait
-If you need to add some additional context to an async function, e.g. compile time captured
-env vars, you can create a span and instrument the async function:
+If you need to add some additional context to an async function, you can create a span and instrument it:
 ```rust
 use tracing::Instrument;
 
@@ -116,13 +112,11 @@ async fn main() {
   "package_name": "testing_traceon"
 }
 ```
-The above `package_name` comes from the `Cargo.toml`:
+The above `package_name` comes from the environment variable provided by cargo, which gets it from `Cargo.toml`:
 ```toml
 [package]
 name = "testing_traceon"
 ```
-It's captured at compile time, and baked into the binary, which is useful as cargo environment
-variables are lost at runtime. 
 
 __IMPORTANT!__ for async functions only ever use the above two methods, which are the `#[instrument]` macro, and
 `Instrument` trait. The guard detailed below should not be used across async boundaries.
@@ -159,7 +153,7 @@ async fn main() {
   "a": 5
 }
 ```
-You can see above that the `span` field was also overwritten with `add`
+You can see above that the nested `"span": "add"` overrode the parent `"span": "math functions"`
 
 The add function from above could be rewritten like this:
 
@@ -170,7 +164,7 @@ async fn add(a: i32, b: i32) {
 }
 ```
 This will cause the span to exit at the end of the function when _span is dropped, just remember to 
-be very careful not to put any `.await` points when an `EnteredSpan` like `_span` above is being held
+be very careful not to put any `.await` points when an `EnteredSpan` like `_span` above is being held.
 
 ### Turn off fields
 This is an example of changing all the defaults fields to their opposites:
