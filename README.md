@@ -16,13 +16,10 @@ cargo run | jq -R 'fromjson?'
 
 By default `env-filter` is used at the `info` level, to change the level you can set an environment variable e.g. `RUST_LOG=warn`, all the options are [detailed here](https://docs.rs/env_logger/latest/env_logger/)
 
-This crate uses the idea originated from: [LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter) of storing fields from visited spans in a `HashMap` which is more suited for flattening fields, and results in very similar performance to the json formatter in `tracing-subcriber`:
-[benchmark](benchmark.png)
-
 ## Examples
 
 ### Simple Example
-The fields output below are defaults that can be turned off:
+The extra fields outputted below are defaults that can be turned off:
 ```rust
 fn main() {
     traceon::on();
@@ -158,7 +155,7 @@ This will cause the span to exit at the end of the function when _span is droppe
 This is an example of changing all the defaults fields to their opposites:
 
 ```rust
-use traceon::{Level, Traceon};
+use traceon::LevelFormat;
 
 mod helpers {
     pub fn trace() {
@@ -166,14 +163,13 @@ mod helpers {
     }
 }
 
-#[tokio::main]
-async fn main() {
-    Traceon::new()
+fn main() {
+    traceon::builder()
         .module(true)
         .span(false)
         .file(false)
         .time(false)
-        .level(Level::Off)
+        .level(LevelFormat::Off)
         .on();
 
     tracing::info!("only the module and message");
@@ -199,3 +195,46 @@ name = "bootstrap"
 path = "src/main.rs"
 ```
 
+### Write to a file
+If you wanted to write to log files instead of std, it's as simple adding the dependency to `Cargo.toml`:
+```toml
+[dependencies]
+tracing-appender = "0.2.2"
+```
+And initializing it via the builder: 
+```rust
+fn main() {
+    let file_appender = tracing_appender::rolling::hourly("./", "test.log");
+    traceon::builder().writer(file_appender).on();
+    tracing::info!("wow cool!");
+}
+```
+
+### Compose with other layers
+You can also use the formatting and storage layer with other tracing layers as you get more comfortable with the tracing ecosystem, e.g. to change the filter:
+
+```rust
+use traceon::Traceon;
+use tracing_subscriber::{prelude::*, EnvFilter};
+
+fn main() {
+    tracing_subscriber::registry()
+        .with(Traceon::default())
+        .with(EnvFilter::new("error"))
+        .init();
+
+    tracing::info!("info log message won't write to stdout");
+    tracing::error!("only error messages will write to stdout");
+}
+```
+
+## Performance
+This crate uses the idea originated from: [LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter) of storing fields from visited spans in a `HashMap` instead of a `BTreeMap` which is more suited for flattening fields, and results in very similar performance to the json formatter in `tracing-subcriber`:
+
+logging to a sink
+![benchmark std sink](images/benchmark-std-sink.png)
+units = nanosecond or billionth of a second
+
+logging to stdout
+![benchmark std out](images/benchmark-std-out.png)
+units = microsecond or millionth of a second

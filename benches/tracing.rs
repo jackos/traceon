@@ -7,6 +7,7 @@ fn bench_traceon(c: &mut Criterion) {
     group.bench_function("traceon", |b| {
         let _guard = traceon::Traceon::new()
             .file(false)
+			.writer(std::io::stdout())
             .on_thread();
         b.iter(|| {
             black_box(tracing::info!("testing out a resonably long string"));
@@ -20,6 +21,7 @@ fn bench_traceon(c: &mut Criterion) {
         .with_target(false)
         .flatten_event(true)
         .with_span_list(false)
+		.with_writer(std::io::stdout)
         .init();
     group.bench_function("tracing_subscriber json", |b| {
         b.iter(|| {

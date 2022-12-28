@@ -4,12 +4,9 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use time::format_description::well_known::Rfc3339;
-use traceon::{Traceon};
 use tracing::{info, span, Level};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Registry;
-
-mod mock_writer;
 
 /// Tests have to be run on a single thread because we are re-using the same buffer for
 /// all of them.
@@ -22,7 +19,7 @@ lazy_static! {
 fn run_and_get_raw_output<F: Fn()>(action: F) -> String {
     let mut default_fields = HashMap::new();
     default_fields.insert("custom_field".to_string(), json!("custom_value"));
-    let traceon = Traceon::new();
+    let traceon = traceon::builder();
     let subscriber = Registry::default().with(traceon);
     tracing::subscriber::with_default(subscriber, action);
 

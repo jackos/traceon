@@ -1,5 +1,30 @@
+//! This has nothing to do with traceon, it's just a simple example showing
+//! how you could build your own storage and formatting layer from scratch
+//! using a BTreeMap instead of the HashMap that traceon uses. Have it here for
+//! future reference as the BTreeMap apears to have slightly better performance
+//!
+//! It's from the guide is provided here:
+//! https://burgers.io/custom-logging-in-rust-using-tracing-part-2
 use std::collections::BTreeMap;
+use tracing::{debug_span, info, info_span};
+use tracing_subscriber::prelude::*;
 use tracing_subscriber::Layer;
+
+fn main() {
+    tracing_subscriber::registry()
+        .with(CustomLayer::new())
+        .init();
+    tracing::info!("first log message");
+
+    let outer_span = info_span!("outer", level = 0);
+    let _outer_entered = outer_span.enter();
+
+    let inner_span = debug_span!("inner", level = 1);
+    let _inner_entered = inner_span.enter();
+
+    info!(a_bool = true, answer = 42, message = "first example");
+}
+
 pub struct CustomLayer {
     pub file: bool,
 }
