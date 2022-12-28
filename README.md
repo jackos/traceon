@@ -98,7 +98,7 @@ The above `package_name` comes from the environment variable provided by cargo, 
 name = "testing_traceon"
 ```
 
-__IMPORTANT!__ for async functions only ever use the above two methods, which are the `#[instrument]` macro, and `Instrument` trait. 
+__IMPORTANT!__ if you're using async functions the above two methods should be used to create a span, [more details here](https://docs.rs/tracing/latest/tracing/struct.Span.html#in-asynchronous-code) 
 
 ### Nested spans
 To combine the output from the two examples above we can enter a span with the arguments added to the trace:
@@ -106,7 +106,8 @@ To combine the output from the two examples above we can enter a span with the a
 use tracing::Instrument;
 
 async fn add(a: i32, b: i32) {
-    // Important! Don't put any `.await` calls in between `entered()` and `exit()`
+    // Warning! Don't put any `.await` calls in between `entered()` and `exit()`
+	// it will cause information loss and memory leaks
     let span = tracing::info_span!("add", a, b).entered();
     tracing::info!("result: {}", a + b);
     span.exit();
@@ -171,8 +172,7 @@ fn main() {
 }
 ```
 
-
-The add function from above could be rewritten like this:
+The `add` function from above could be rewritten like this:
 
 ```rust
 async fn add(a: i32, b: i32) {
@@ -241,20 +241,40 @@ fn main() {
 ```
 
 ### Compose with other layers
-You can also use the formatting and storage layer with other tracing layers as you get more comfortable with the tracing ecosystem, e.g. to change the filter:
+You can also use the formatting layer with other tracing layers as you get more comfortable with the tracing ecosystem, e.g. to change the filter:
 
 ```rust
-use traceon::Traceon;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 fn main() {
     tracing_subscriber::registry()
-        .with(Traceon::default())
+        .with(traceon::builder())
         .with(EnvFilter::new("error"))
         .init();
 
     tracing::info!("info log message won't write to stdout");
     tracing::error!("only error messages will write to stdout");
+}
+```
+
+### Change the case of keys
+Often you'll be consuming different crates that implement their own traces, and you need all keys to match a certain format:
+```rust
+use traceon::KeyCase;
+fn main() {
+    traceon::builder().key_case(KeyCase::Snake).on();
+    let _span = tracing::info_span!("wow", BadCase = "change the key to snake case").entered();
+    tracing::info!("make sure PascalCase changes to snake_case");
+}
+```
+```json
+{
+  "level": 30,
+  "timestamp": "2022-12-28T15:52:44.521437Z",
+  "module": "casing",
+  "file": "examples/casing.rs:4",
+  "message": "make sure PascalCase changes to snake_case",
+  "bad_case": "change the key to snake case"
 }
 ```
 
@@ -275,5 +295,5 @@ logging to stdout
 ![benchmark std out](images/benchmark-std-out.png)
 units = microsecond or millionth of a second
 
-And if we nest spans three levels deep, even concatenating repeated fields, we get better overall performance:
+And if we nest spans three levels deep, we get better overall performance even with concatenated fields:
 ![benchmark std out](images/benchmark-async.png)

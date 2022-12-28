@@ -1,18 +1,11 @@
 #![doc = include_str!("../README.md")]
 mod traceon;
-pub use crate::traceon::Traceon;
+pub use crate::traceon::{KeyCase, LevelFormat, Traceon};
 
 pub use tracing;
 use tracing::subscriber::DefaultGuard;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{EnvFilter, Registry};
-
-#[derive(Copy, Clone)]
-pub enum LevelFormat {
-    Off,
-    Text,
-    Number,
-}
 
 /// Use the defaults and set the global default subscriber
 #[must_use]
