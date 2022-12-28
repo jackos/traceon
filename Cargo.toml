@@ -1,6 +1,6 @@
 [package]
 name = "traceon"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Jack Clayton <jackos@me.com>"]
 edition = "2021"
 license = "MIT/Apache-2.0"
@@ -31,6 +31,12 @@ time = { version = "0.3", default-features = false, features = ["formatting"] }
 [dev-dependencies]
 claims = "0.6.0"
 lazy_static = "1.4.0"
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+	"registry",
+	"fmt",
+	"env-filter",
+	"json",
+] }
 tracing = { version = "0.1.13", default-features = false, features = [
 	"log",
 	"std",
@@ -42,3 +48,8 @@ time = { version = "0.3", default-features = false, features = [
 	"local-offset",
 ] }
 tokio = { version = "1.23.0", features = ["full"] }
+criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
+
+[[bench]]
+name = "tracing"
+harness = false

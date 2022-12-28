@@ -58,10 +58,8 @@ impl<
     fn serialize_core_fields(
         &self,
         map_serializer: &mut impl SerializeMap<Error = serde_json::Error>,
-        message: &str,
         level: &CoreLevel,
     ) -> Result<(), std::io::Error> {
-        map_serializer.serialize_entry("message", &message)?;
         match self.level {
             Level::Text => {
                 map_serializer.serialize_entry("level", &level.to_string())?;
@@ -113,7 +111,19 @@ impl<
             .with(env_filter);
 
         // Panic if user is trying to set two global default subscribers
-        tracing::subscriber::set_global_default(subscriber).unwrap();
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("more than one global default subscriber set");
+    }
+
+    pub fn on_thread(&self) -> tracing::subscriber::DefaultGuard {
+        let env_filter =
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+        let subscriber = Registry::default()
+            .with(StorageLayer)
+            .with(*self)
+            .with(env_filter);
+
+        tracing::subscriber::set_default(subscriber)
     }
 
     pub fn on_with_filter(&self, filter: EnvFilter) {
@@ -162,8 +172,7 @@ where
             let mut serializer = serde_json::Serializer::new(&mut buffer);
             let mut map_serializer = serializer.serialize_map(None)?;
 
-            let message = format_event_message(event, &event_visitor);
-            self.serialize_core_fields(&mut map_serializer, &message, event.metadata().level())?;
+            self.serialize_core_fields(&mut map_serializer, event.metadata().level())?;
             // Add file and line number to the json
             let metadata = event.metadata();
             if self.span {
