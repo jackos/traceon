@@ -18,6 +18,7 @@ tracing-log = "0.1"
 serde = "1"
 serde_json = "1"
 time = { version = "0.3", default-features = false, features = ["formatting"] }
+convert_case = "0.6.0"
 
 [dependencies.tracing-subscriber]
 version = "0.3"

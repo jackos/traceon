@@ -1,4 +1,3 @@
-use crate::LevelFormat;
 use serde::ser::{SerializeMap, Serializer};
 use std::{
     collections::HashMap,
@@ -23,7 +22,23 @@ pub struct Traceon {
     pub span: bool,
     pub time: bool,
     pub concat: String,
-    pub level: crate::LevelFormat,
+    pub level: LevelFormat,
+    pub key_case: KeyCase,
+}
+
+#[derive(Clone)]
+pub enum KeyCase {
+    Camel,
+    Pascal,
+    Snake,
+    None,
+}
+
+#[derive(Copy, Clone)]
+pub enum LevelFormat {
+    Off,
+    Text,
+    Number,
 }
 
 impl Default for Traceon {
@@ -38,7 +53,8 @@ impl Default for Traceon {
             file: true,
             span: true,
             time: true,
-            module: false,
+            module: true,
+            key_case: KeyCase::None,
             level: crate::LevelFormat::Number,
         }
     }
@@ -79,6 +95,11 @@ impl Traceon {
     #[must_use]
     pub fn writer(&mut self, writer: impl Write + Send + Sync + 'static) -> &mut Self {
         self.writer = Arc::new(Mutex::new(writer));
+        self
+    }
+    #[must_use]
+    pub fn key_case(&mut self, key_case: KeyCase) -> &mut Self {
+        self.key_case = key_case;
         self
     }
 
@@ -122,6 +143,11 @@ where
 
         // Closure allows use of the ? syntax
         let format = || {
+            let (level_key, file_key, module_key, timestamp_key) = match self.key_case {
+                KeyCase::Pascal => ("Level", "File", "Module", "Timestamp"),
+                _ => ("level", "file", "module", "timestamp"),
+            };
+
             let mut buffer = Vec::new();
 
             let mut serializer = serde_json::Serializer::new(&mut buffer);
@@ -130,7 +156,7 @@ where
             let metadata = event.metadata();
             match self.level {
                 LevelFormat::Text => {
-                    map_serializer.serialize_entry("level", &metadata.level().to_string())?;
+                    map_serializer.serialize_entry(level_key, &metadata.level().to_string())?;
                 }
                 LevelFormat::Number => {
                     let number = match metadata.level().as_log() {
@@ -141,24 +167,24 @@ where
                         log::Level::Trace => 10,
                     };
 
-                    map_serializer.serialize_entry("level", &number)?;
+                    map_serializer.serialize_entry(level_key, &number)?;
                 }
                 LevelFormat::Off => (),
             }
             if self.time {
                 if let Ok(time) = &time::OffsetDateTime::now_utc().format(&Rfc3339) {
-                    map_serializer.serialize_entry("time", time)?;
+                    map_serializer.serialize_entry(timestamp_key, time)?;
                 }
             }
 
             if self.module {
                 map_serializer
-                    .serialize_entry("module", metadata.module_path().unwrap_or_default())?;
+                    .serialize_entry(module_key, metadata.module_path().unwrap_or_default())?;
             }
 
             if self.file {
                 map_serializer.serialize_entry(
-                    "file",
+                    file_key,
                     &format!(
                         "{}:{}",
                         metadata.file().unwrap_or_default(),
@@ -169,7 +195,14 @@ where
 
             // Add all the fields from the current event.
             for (key, value) in event_visitor.values.iter() {
-                map_serializer.serialize_entry(key, value)?;
+                let key = match self.key_case {
+                    KeyCase::Snake => snake(key),
+                    KeyCase::Pascal => pascal(key),
+                    KeyCase::Camel => camel(key),
+                    KeyCase::None => key.to_string(),
+                };
+
+                map_serializer.serialize_entry(&key, value)?;
             }
 
             // Add all the fields from the current span, if we have one.
@@ -177,7 +210,14 @@ where
                 let extensions = span.extensions();
                 if let Some(visitor) = extensions.get::<JsonStorage>() {
                     for (key, value) in &visitor.values {
-                        map_serializer.serialize_entry(key, value)?;
+                        let key = match self.key_case {
+                            KeyCase::Snake => snake(key),
+                            KeyCase::Pascal => pascal(key),
+                            KeyCase::Camel => camel(key),
+                            KeyCase::None => key.to_string(),
+                        };
+
+                        map_serializer.serialize_entry(&key, value)?;
                     }
                 }
             }
@@ -263,6 +303,37 @@ impl<'a> JsonStorage<'a> {
             concat,
         }
     }
+}
+
+fn snake(key: &str) -> String {
+    let mut snake = String::new();
+    for (i, ch) in key.char_indices() {
+        if i > 0 && ch.is_uppercase() {
+            snake.push('_');
+        }
+        snake.push(ch.to_ascii_lowercase());
+    }
+    snake
+}
+
+fn pascal(key: &str) -> String {
+    let mut pascal = String::new();
+    let mut capitalize = true;
+    for ch in key.chars() {
+        if ch == '_' {
+            capitalize = true;
+        } else if capitalize {
+            pascal.push(ch.to_ascii_uppercase());
+            capitalize = false;
+        } else {
+            pascal.push(ch);
+        }
+    }
+    pascal
+}
+
+fn camel(pascal: &str) -> String {
+    pascal[..1].to_ascii_lowercase() + &pascal[1..]
 }
 
 impl Visit for JsonStorage<'_> {
