@@ -22,6 +22,7 @@ pub struct Traceon {
     pub module: bool,
     pub span: bool,
     pub time: bool,
+    pub concat: String,
     pub level: crate::LevelFormat,
 }
 
@@ -33,6 +34,7 @@ impl Default for Traceon {
         Traceon {
             writer: Arc::new(Mutex::new(std::io::stdout())),
             filter,
+            concat: "".into(),
             file: true,
             span: true,
             time: true,
@@ -57,6 +59,11 @@ impl Traceon {
     #[must_use]
     pub fn module(&mut self, on: bool) -> &mut Self {
         self.module = on;
+        self
+    }
+    #[must_use]
+    pub fn concat(&mut self, concat: &str) -> &mut Self {
+        self.concat = concat.to_string();
         self
     }
     #[must_use]
@@ -85,19 +92,21 @@ impl Traceon {
             .expect("more than one global default subscriber set");
     }
 
+    /// Use the defaults and set the global default subscriber
+    pub fn try_on(&self) -> Result<(), tracing::subscriber::SetGlobalDefaultError> {
+        let env_filter =
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+        let subscriber = Registry::default().with(self.clone()).with(env_filter);
+
+        tracing::subscriber::set_global_default(subscriber)
+    }
+
     pub fn on_thread(&self) -> tracing::subscriber::DefaultGuard {
         let env_filter =
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
         let subscriber = Registry::default().with(self.clone()).with(env_filter);
 
         tracing::subscriber::set_default(subscriber)
-    }
-
-    pub fn on_with_filter(&self, filter: EnvFilter) {
-        let subscriber = Registry::default().with(self.clone()).with(filter);
-
-        // Panic if user is trying to set two global default subscribers
-        tracing::subscriber::set_global_default(subscriber).unwrap();
     }
 }
 
@@ -108,7 +117,7 @@ where
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         let current_span = ctx.lookup_current();
 
-        let mut event_visitor = JsonStorage::default();
+        let mut event_visitor = JsonStorage::new(self.concat.clone());
         event.record(&mut event_visitor);
 
         // Closure allows use of the ? syntax
@@ -142,12 +151,6 @@ where
                 }
             }
 
-            if self.span {
-                if let Some(span) = &current_span {
-                    map_serializer.serialize_entry("span", span.metadata().name())?;
-                }
-            }
-
             if self.module {
                 map_serializer
                     .serialize_entry("module", metadata.module_path().unwrap_or_default())?;
@@ -164,6 +167,7 @@ where
                 )?;
             }
 
+            // Add all the fields from the current event.
             for (key, value) in event_visitor.values.iter() {
                 map_serializer.serialize_entry(key, value)?;
             }
@@ -182,6 +186,9 @@ where
         };
 
         let result: std::io::Result<Vec<u8>> = format();
+        if let Err(e) = &result {
+            dbg!(e);
+        }
         if let Ok(mut formatted) = result {
             formatted.write_all(b"\n").unwrap();
             self.writer.lock().unwrap().write_all(&formatted).unwrap();
@@ -194,12 +201,35 @@ where
         // We want to inherit the fields from the parent span, if there is one.
         let mut visitor = if let Some(parent_span) = span.parent() {
             let mut extensions = parent_span.extensions_mut();
-            extensions
+            let mut storage = extensions
                 .get_mut::<JsonStorage>()
                 .map(|v| v.to_owned())
-                .unwrap_or_default()
+                .unwrap_or_default();
+            if self.span {
+                if let Some(orig) = storage.values.insert(
+                    "span",
+                    serde_json::Value::from(format!(
+                        "{}::{}",
+                        parent_span.metadata().name(),
+                        span.metadata().name()
+                    )),
+                ) {
+                    if self.concat != "" {
+                        storage.values.insert(
+                            "span",
+                            serde_json::Value::from(format!(
+                                "{}{}{}",
+                                orig.as_str().unwrap_or(""),
+                                self.concat,
+                                span.metadata().name()
+                            )),
+                        );
+                    }
+                };
+            }
+            storage
         } else {
-            JsonStorage::default()
+            JsonStorage::new(self.concat.clone())
         };
 
         let mut extensions = span.extensions_mut();
@@ -223,6 +253,16 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct JsonStorage<'a> {
     pub values: HashMap<&'a str, serde_json::Value>,
+    pub concat: String,
+}
+
+impl<'a> JsonStorage<'a> {
+    pub fn new(concat: String) -> Self {
+        JsonStorage {
+            values: HashMap::new(),
+            concat,
+        }
+    }
 }
 
 impl Visit for JsonStorage<'_> {
@@ -243,8 +283,17 @@ impl Visit for JsonStorage<'_> {
             .insert(field.name(), serde_json::Value::from(value));
     }
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.values
-            .insert(field.name(), serde_json::Value::from(value));
+        if let Some(orig) = self
+            .values
+            .insert(field.name(), serde_json::Value::from(value))
+        {
+            if self.concat != "" {
+                let orig = orig.as_str().unwrap_or("");
+                let new = format!("{orig}{}{value}", self.concat);
+                self.values
+                    .insert(field.name(), serde_json::Value::from(new));
+            }
+        }
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
