@@ -1,15 +1,13 @@
 #![doc = include_str!("../README.md")]
 mod formatting;
-mod storage;
-
 pub use formatting::Traceon;
-pub use storage::{JsonStorage, StorageLayer};
 
 pub use tracing;
 use tracing::subscriber::DefaultGuard;
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{EnvFilter, Registry};
+
 
 #[derive(Copy, Clone)]
 pub enum Level {
@@ -22,10 +20,7 @@ pub enum Level {
 pub fn on() {
     let traceon = Traceon::new(std::io::stdout);
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = Registry::default()
-        .with(StorageLayer)
-        .with(traceon)
-        .with(env_filter);
+    let subscriber = Registry::default().with(traceon).with(env_filter);
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("more than one global default subscriber set");
@@ -35,10 +30,7 @@ pub fn on() {
 pub fn on_thread() -> DefaultGuard {
     let traceon = Traceon::new(std::io::stdout);
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = Registry::default()
-        .with(StorageLayer)
-        .with(traceon)
-        .with(env_filter);
+    let subscriber = Registry::default().with(traceon).with(env_filter);
 
     tracing::subscriber::set_default(subscriber)
 }
@@ -50,10 +42,7 @@ pub fn on_with<
     traceon: Traceon<W>,
 ) {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = Registry::default()
-        .with(StorageLayer)
-        .with(traceon)
-        .with(env_filter);
+    let subscriber = Registry::default().with(traceon).with(env_filter);
 
     // Panic straight away if user is trying to set two global default subscribers
     tracing::subscriber::set_global_default(subscriber).unwrap();

@@ -1,6 +1,5 @@
 use tracing::Instrument;
 
-#[tracing::instrument]
 async fn add(a: i32, b: i32) {
     // Important! Don't put any `.await` calls in between `entered()` and `exit()`
     let _span = tracing::info_span!("add", a, b).entered();
