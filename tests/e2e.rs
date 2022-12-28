@@ -1,11 +1,10 @@
-use crate::mock_writer::MockWriter;
 use claims::assert_some_eq;
 use lazy_static::lazy_static;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use time::format_description::well_known::Rfc3339;
-use traceon::{StorageLayer, Traceon};
+use traceon::{Traceon};
 use tracing::{info, span, Level};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Registry;
@@ -23,8 +22,8 @@ lazy_static! {
 fn run_and_get_raw_output<F: Fn()>(action: F) -> String {
     let mut default_fields = HashMap::new();
     default_fields.insert("custom_field".to_string(), json!("custom_value"));
-    let traceon = Traceon::new(|| MockWriter::new(&BUFFER));
-    let subscriber = Registry::default().with(StorageLayer).with(traceon);
+    let traceon = Traceon::new();
+    let subscriber = Registry::default().with(traceon);
     tracing::subscriber::with_default(subscriber, action);
 
     // Return the formatted output as a string to make assertions against

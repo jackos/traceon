@@ -5,7 +5,7 @@ fn bench_traceon(c: &mut Criterion) {
     let mut group = c.benchmark_group("traceon");
 
     group.bench_function("traceon", |b| {
-        let _guard = traceon::Traceon::new(std::io::stdout)
+        let _guard = traceon::Traceon::new()
             .file(false)
             .on_thread();
         b.iter(|| {

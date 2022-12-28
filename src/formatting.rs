@@ -7,7 +7,6 @@ use tracing::{Event, Subscriber};
 use tracing_core::{metadata::Level as CoreLevel, Field};
 use tracing_log::AsLog;
 use tracing_subscriber::{
-    fmt::MakeWriter,
     layer::{Context, SubscriberExt},
     EnvFilter, Layer, Registry,
 };
@@ -23,11 +22,8 @@ fn level_to_u16(level: &CoreLevel) -> u16 {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct Traceon<
-    W: for<'a> MakeWriter<'a> + 'static + std::marker::Sync + std::marker::Send + Copy + Clone,
-> {
-    pub writer: W,
+#[derive(Clone, Copy)]
+pub struct Traceon {
     pub file: bool,
     pub module: bool,
     pub span: bool,
@@ -35,14 +31,11 @@ pub struct Traceon<
     pub level: crate::Level,
 }
 
-impl<
-        W: for<'a> MakeWriter<'a> + 'static + std::marker::Sync + std::marker::Send + Copy + Clone,
-    > Traceon<W>
-{
+impl Traceon {
     /// Set the writer with defaults and returns a instance of Traceon
-    pub fn new(writer: W) -> Traceon<W> {
+    #[must_use]
+    pub fn new() -> Traceon {
         Traceon {
-            writer,
             file: true,
             span: true,
             time: true,
@@ -76,33 +69,38 @@ impl<
 
     fn emit(&self, mut buffer: Vec<u8>) -> Result<(), std::io::Error> {
         buffer.write_all(b"\n")?;
-        self.writer.make_writer().write_all(&buffer)
+        std::io::stdout().write_all(&buffer)
     }
+    #[must_use]
     pub fn file(&mut self, on: bool) -> &mut Self {
         self.file = on;
         self
     }
+    #[must_use]
     pub fn span(&mut self, on: bool) -> &mut Self {
         self.span = on;
         self
     }
+    #[must_use]
     pub fn module(&mut self, on: bool) -> &mut Self {
         self.module = on;
         self
     }
+	#[must_use]
     pub fn time(&mut self, on: bool) -> &mut Self {
         self.time = on;
         self
     }
+	#[must_use]
     pub fn level(&mut self, level_type: Level) -> &mut Self {
         self.level = level_type;
         self
     }
 
-    pub fn on(&self) {
+    pub fn on(self) {
         let env_filter =
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-        let subscriber = Registry::default().with(*self).with(env_filter);
+        let subscriber = Registry::default().with(self).with(env_filter);
 
         // Panic if user is trying to set two global default subscribers
         tracing::subscriber::set_global_default(subscriber)
@@ -125,10 +123,9 @@ impl<
     }
 }
 
-impl<S, W> Layer<S> for Traceon<W>
+impl<S> Layer<S> for Traceon
 where
     S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
-    W: for<'a> MakeWriter<'a> + 'static + std::marker::Sync + std::marker::Send + Clone + Copy,
 {
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         // Events do not necessarily happen in the context of a span, hence lookup_current
