@@ -1,6 +1,6 @@
 [package]
 name = "traceon"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Jack Clayton <jackos@me.com>"]
 edition = "2021"
 license = "MIT/Apache-2.0"
@@ -12,43 +12,44 @@ keywords = ["logging", "metrics", "tracing", "subscriber"]
 categories = ["development-tools::profiling", "development-tools::debugging"]
 
 [dependencies]
-tracing = { version = "0.1", default-features = false, features = [
-	"log",
-	"std",
-] }
-tracing-subscriber = { version = "0.3", default-features = false, features = [
-	"registry",
-	"fmt",
-	"env-filter",
-] }
-tracing-log = { version = "0.1" }
 log = "0.4"
-serde_json = { version = "1" }
-serde = "1"
 tracing-core = "0.1"
+tracing-log = "0.1"
+serde = "1"
+serde_json = "1"
 time = { version = "0.3", default-features = false, features = ["formatting"] }
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+default-features = false
+features = ["registry", "fmt", "env-filter"]
+
+[dependencies.tracing]
+version = "0.1"
+default-features = false
+features = ["log", "std"]
 
 [dev-dependencies]
 claims = "0.6.0"
 lazy_static = "1.4.0"
-tracing-subscriber = { version = "0.3", default-features = false, features = [
-	"registry",
-	"fmt",
-	"env-filter",
-	"json",
-] }
-tracing = { version = "0.1.13", default-features = false, features = [
-	"log",
-	"std",
-	"attributes",
-] }
-time = { version = "0.3", default-features = false, features = [
-	"formatting",
-	"parsing",
-	"local-offset",
-] }
 tokio = { version = "1.23.0", features = ["full"] }
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
+tracing-appender = "0.2.2"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+default-features = false
+features = ["registry", "fmt", "env-filter", "json"]
+
+[dev-dependencies.tracing]
+version = "0.1"
+default-features = false
+features = ["log", "std", "attributes"]
+
+[dev-dependencies.time]
+version = "0.3"
+default-features = false
+features = ["formatting", "parsing", "local-offset"]
 
 [[bench]]
 name = "tracing"

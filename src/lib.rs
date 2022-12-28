@@ -1,60 +1,49 @@
 #![doc = include_str!("../README.md")]
-mod formatting;
-mod storage;
-
-pub use formatting::Traceon;
-pub use storage::{JsonStorage, StorageLayer};
+mod traceon;
+pub use crate::traceon::Traceon;
 
 pub use tracing;
 use tracing::subscriber::DefaultGuard;
-use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{EnvFilter, Registry};
 
 #[derive(Copy, Clone)]
-pub enum Level {
+pub enum LevelFormat {
     Off,
     Text,
     Number,
 }
 
 /// Use the defaults and set the global default subscriber
+#[must_use]
+pub fn builder() -> Traceon {
+    Traceon::default()
+}
+
+/// Use the defaults and set the global default subscriber
 pub fn on() {
-    let traceon = Traceon::new(std::io::stdout);
+    let traceon = Traceon::default();
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = Registry::default()
-        .with(StorageLayer)
-        .with(traceon)
-        .with(env_filter);
+    let subscriber = Registry::default().with(traceon).with(env_filter);
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("more than one global default subscriber set");
 }
 
 /// Use the defaults and set the global default subscriber
-pub fn on_thread() -> DefaultGuard {
-    let traceon = Traceon::new(std::io::stdout);
+pub fn try_on() -> Result<(), tracing::subscriber::SetGlobalDefaultError> {
+    let traceon = Traceon::default();
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = Registry::default()
-        .with(StorageLayer)
-        .with(traceon)
-        .with(env_filter);
+    let subscriber = Registry::default().with(traceon).with(env_filter);
 
-    tracing::subscriber::set_default(subscriber)
+    tracing::subscriber::set_global_default(subscriber)
 }
 
-/// Use the defaults and set the global default subscriber with a custom filter
-pub fn on_with<
-    W: for<'a> MakeWriter<'a> + 'static + std::marker::Sync + std::marker::Send + Clone + Copy,
->(
-    traceon: Traceon<W>,
-) {
+/// Use the defaults and set the global default subscriber
+pub fn on_thread() -> DefaultGuard {
+    let traceon = Traceon::default();
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = Registry::default()
-        .with(StorageLayer)
-        .with(traceon)
-        .with(env_filter);
+    let subscriber = Registry::default().with(traceon).with(env_filter);
 
-    // Panic straight away if user is trying to set two global default subscribers
-    tracing::subscriber::set_global_default(subscriber).unwrap();
+    tracing::subscriber::set_default(subscriber)
 }

@@ -1,13 +1,7 @@
 # Traceon - trace on json
-A simple log and trace formatter with a structured json output, it flattens events from nested spans,
-overriding the parent if required.
+A simple log and trace formatter with a structured json output, it flattens events from nested spans, overriding parent fields.
 
-The `tracing` crate is difficult to understand initially, this crate is designed to be as easy
-to use as possible with sensible defaults and configuration options. It should only be used from 
-a binary, don't use in library code as it sets the default subscriber which could cause conflicts 
-for users.
-
-The only two crates you'll need in your `Cargo.toml` are:
+The `tracing` crate is difficult to understand initially, this crate is designed to be as easy to use as possible with sensible defaults and configuration options. The only two crates you'll need in your `Cargo.toml` are:
 
 ```toml
 [dependencies]
@@ -15,22 +9,17 @@ tracing = "0.1"
 traceon = "0.1"
 ```
 
-For pretty printing the output like the examples below, install [jq](https://stedolan.github.io/jq/download/)
-and run commands like:
+For pretty printing the output like the examples below, install [jq](https://stedolan.github.io/jq/download/) and run commands like:
 ```bash
 cargo run | jq -R 'fromjson?'
 ```
 
-By default `env-filter` is used at the `info` level, to change the level see options [detailed here](https://docs.rs/env_logger/latest/env_logger/) for example `RUST_LOG=warn`
-
-This crate uses code originated from: 
-[LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter)
-which is great for [bunyan formatting](https://www.npmjs.com/package/bunyan-format)
+By default `env-filter` is used at the `info` level, to change the level you can set an environment variable e.g. `RUST_LOG=warn`, all the options are [detailed here](https://docs.rs/env_logger/latest/env_logger/)
 
 ## Examples
 
 ### Simple Example
-The fields output below are defaults that can be turned off:
+The extra fields outputted below are defaults that can be turned off:
 ```rust
 fn main() {
     traceon::on();
@@ -57,9 +46,7 @@ error: 50
 ```
 
 ### \#\[instrument\] macro
-If you're using normal functions or `async`, you can use the `tracing::instrument` macro to capture
-the parameters for each function call:
-
+If you're using normal functions or `async`, you can use the `tracing::instrument` macro to capture the parameters for each function call:
 ```rust
 #[tracing::instrument]
 async fn add(a: i32, b: i32) {
@@ -118,8 +105,7 @@ The above `package_name` comes from the environment variable provided by cargo, 
 name = "testing_traceon"
 ```
 
-__IMPORTANT!__ for async functions only ever use the above two methods, which are the `#[instrument]` macro, and
-`Instrument` trait. The guard detailed below should not be used across async boundaries.
+__IMPORTANT!__ for async functions only ever use the above two methods, which are the `#[instrument]` macro, and `Instrument` trait. The guard detailed below should not be used across async boundaries.
 
 ### Instrument trait and entered span
 To combine the output from the two examples above we can enter a span with the arguments added to the trace:
@@ -163,14 +149,13 @@ async fn add(a: i32, b: i32) {
     tracing::info!("result: {}", a + b);
 }
 ```
-This will cause the span to exit at the end of the function when _span is dropped, just remember to 
-be very careful not to put any `.await` points when an `EnteredSpan` like `_span` above is being held.
+This will cause the span to exit at the end of the function when _span is dropped, just remember to be very careful not to put any `.await` points when an `EnteredSpan` like `_span` above is being held.
 
 ### Turn off fields
 This is an example of changing all the defaults fields to their opposites:
 
 ```rust
-use traceon::{Level, Traceon};
+use traceon::LevelFormat;
 
 mod helpers {
     pub fn trace() {
@@ -178,14 +163,13 @@ mod helpers {
     }
 }
 
-#[tokio::main]
-async fn main() {
-    Traceon::new(std::io::stdout)
+fn main() {
+    traceon::builder()
         .module(true)
         .span(false)
         .file(false)
         .time(false)
-        .level(Level::Off)
+        .level(LevelFormat::Off)
         .on();
 
     tracing::info!("only the module and message");
@@ -211,3 +195,46 @@ name = "bootstrap"
 path = "src/main.rs"
 ```
 
+### Write to a file
+If you wanted to write to log files instead of std, it's as simple adding the dependency to `Cargo.toml`:
+```toml
+[dependencies]
+tracing-appender = "0.2.2"
+```
+And initializing it via the builder: 
+```rust
+fn main() {
+    let file_appender = tracing_appender::rolling::hourly("./", "test.log");
+    traceon::builder().writer(file_appender).on();
+    tracing::info!("wow cool!");
+}
+```
+
+### Compose with other layers
+You can also use the formatting and storage layer with other tracing layers as you get more comfortable with the tracing ecosystem, e.g. to change the filter:
+
+```rust
+use traceon::Traceon;
+use tracing_subscriber::{prelude::*, EnvFilter};
+
+fn main() {
+    tracing_subscriber::registry()
+        .with(Traceon::default())
+        .with(EnvFilter::new("error"))
+        .init();
+
+    tracing::info!("info log message won't write to stdout");
+    tracing::error!("only error messages will write to stdout");
+}
+```
+
+## Performance
+This crate uses the idea originated from: [LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter) of storing fields from visited spans in a `HashMap` instead of a `BTreeMap` which is more suited for flattening fields, and results in very similar performance to the json formatter in `tracing-subcriber`:
+
+logging to a sink
+![benchmark std sink](images/benchmark-std-sink.png)
+units = nanosecond or billionth of a second
+
+logging to stdout
+![benchmark std out](images/benchmark-std-out.png)
+units = microsecond or millionth of a second
