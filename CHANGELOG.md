@@ -1,4 +1,8 @@
 # Changelog
+## [0.1.7] - 2022-12-28
+- Fix casing functionality and docs
+- Fix tracing link
+
 ## [0.1.6] - 2022-12-28
 - Improve documentation and examples
 - Fix casing on SCREAMING_CASE 
