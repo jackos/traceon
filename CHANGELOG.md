@@ -1,4 +1,8 @@
 # Changelog
+## [0.1.6] - 2022-12-28
+- Improve documentation and examples
+- Fix casing on SCREAMING_CASE 
+
 ## [0.1.5] - 2022-12-28
 - Add ability to change key casing
 

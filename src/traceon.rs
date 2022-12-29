@@ -16,18 +16,17 @@ use tracing_subscriber::{
 #[derive(Clone)]
 pub struct Traceon {
     pub writer: Arc<Mutex<dyn Write + Sync + Send>>,
-    pub filter: Arc<EnvFilter>,
     pub file: bool,
     pub module: bool,
     pub span: bool,
     pub time: bool,
     pub concat: String,
     pub level: LevelFormat,
-    pub key_case: KeyCase,
+    pub case: Case,
 }
 
 #[derive(Clone)]
-pub enum KeyCase {
+pub enum Case {
     Camel,
     Pascal,
     Snake,
@@ -37,24 +36,22 @@ pub enum KeyCase {
 #[derive(Copy, Clone)]
 pub enum LevelFormat {
     Off,
-    Text,
+    Uppercase,
+    Lowercase,
     Number,
 }
 
 impl Default for Traceon {
     #[must_use]
     fn default() -> Traceon {
-        let filter =
-            Arc::new(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")));
         Traceon {
             writer: Arc::new(Mutex::new(std::io::stdout())),
-            filter,
             concat: "".into(),
             file: true,
             span: true,
             time: true,
             module: true,
-            key_case: KeyCase::None,
+            case: Case::None,
             level: crate::LevelFormat::Number,
         }
     }
@@ -83,7 +80,7 @@ impl Traceon {
         self
     }
     #[must_use]
-    pub fn time(&mut self, on: bool) -> &mut Self {
+    pub fn timestamp(&mut self, on: bool) -> &mut Self {
         self.time = on;
         self
     }
@@ -98,8 +95,8 @@ impl Traceon {
         self
     }
     #[must_use]
-    pub fn key_case(&mut self, key_case: KeyCase) -> &mut Self {
-        self.key_case = key_case;
+    pub fn key_case(&mut self, key_case: Case) -> &mut Self {
+        self.case = key_case;
         self
     }
 
@@ -143,8 +140,8 @@ where
 
         // Closure allows use of the ? syntax
         let format = || {
-            let (level_key, file_key, module_key, timestamp_key) = match self.key_case {
-                KeyCase::Pascal => ("Level", "File", "Module", "Timestamp"),
+            let (level_key, file_key, module_key, timestamp_key) = match self.case {
+                Case::Pascal => ("Level", "File", "Module", "Timestamp"),
                 _ => ("level", "file", "module", "timestamp"),
             };
 
@@ -155,8 +152,14 @@ where
 
             let metadata = event.metadata();
             match self.level {
-                LevelFormat::Text => {
+                LevelFormat::Uppercase => {
                     map_serializer.serialize_entry(level_key, &metadata.level().to_string())?;
+                }
+                LevelFormat::Lowercase => {
+                    map_serializer.serialize_entry(
+                        level_key,
+                        &metadata.level().to_string().to_ascii_lowercase(),
+                    )?;
                 }
                 LevelFormat::Number => {
                     let number = match metadata.level().as_log() {
@@ -176,7 +179,6 @@ where
                     map_serializer.serialize_entry(timestamp_key, time)?;
                 }
             }
-
             if self.module {
                 map_serializer
                     .serialize_entry(module_key, metadata.module_path().unwrap_or_default())?;
@@ -195,11 +197,11 @@ where
 
             // Add all the fields from the current event.
             for (key, value) in event_visitor.values.iter() {
-                let key = match self.key_case {
-                    KeyCase::Snake => snake(key),
-                    KeyCase::Pascal => pascal(key),
-                    KeyCase::Camel => camel(key),
-                    KeyCase::None => key.to_string(),
+                let key = match self.case {
+                    Case::Snake => snake(key),
+                    Case::Pascal => pascal(key),
+                    Case::Camel => camel(key),
+                    Case::None => key.to_string(),
                 };
 
                 map_serializer.serialize_entry(&key, value)?;
@@ -210,11 +212,11 @@ where
                 let extensions = span.extensions();
                 if let Some(visitor) = extensions.get::<JsonStorage>() {
                     for (key, value) in &visitor.values {
-                        let key = match self.key_case {
-                            KeyCase::Snake => snake(key),
-                            KeyCase::Pascal => pascal(key),
-                            KeyCase::Camel => camel(key),
-                            KeyCase::None => key.to_string(),
+                        let key = match self.case {
+                            Case::Snake => snake(key),
+                            Case::Pascal => pascal(key),
+                            Case::Camel => camel(key),
+                            Case::None => key.to_string(),
                         };
 
                         map_serializer.serialize_entry(&key, value)?;
@@ -238,6 +240,10 @@ where
     /// This is the only occasion we have to store the fields attached to the span
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
         let span = ctx.span(id).expect("Span not found, this is a bug");
+        let span_key = match self.case {
+            Case::Pascal => "Span",
+            _ => "span",
+        };
         // We want to inherit the fields from the parent span, if there is one.
         let mut visitor = if let Some(parent_span) = span.parent() {
             let mut extensions = parent_span.extensions_mut();
@@ -247,7 +253,7 @@ where
                 .unwrap_or_default();
             if self.span {
                 if let Some(orig) = storage.values.insert(
-                    "span",
+                    span_key,
                     serde_json::Value::from(format!(
                         "{}::{}",
                         parent_span.metadata().name(),
@@ -256,7 +262,7 @@ where
                 ) {
                     if self.concat != "" {
                         storage.values.insert(
-                            "span",
+                            span_key,
                             serde_json::Value::from(format!(
                                 "{}{}{}",
                                 orig.as_str().unwrap_or(""),
@@ -269,7 +275,11 @@ where
             }
             storage
         } else {
-            JsonStorage::new(self.concat.clone())
+            let mut storage = JsonStorage::new(self.concat.clone());
+            storage
+                .values
+                .insert(span_key, serde_json::Value::from(span.metadata().name()));
+            storage
         };
 
         let mut extensions = span.extensions_mut();
@@ -307,9 +317,15 @@ impl<'a> JsonStorage<'a> {
 
 fn snake(key: &str) -> String {
     let mut snake = String::new();
+    let mut upper_or_underscore_last = false;
     for (i, ch) in key.char_indices() {
-        if i > 0 && ch.is_uppercase() {
+        if i > 0 && ch.is_uppercase() && !upper_or_underscore_last {
             snake.push('_');
+        }
+        if ch.is_uppercase() || ch == '_' {
+            upper_or_underscore_last = true;
+        } else {
+            upper_or_underscore_last = false;
         }
         snake.push(ch.to_ascii_lowercase());
     }
@@ -319,6 +335,7 @@ fn snake(key: &str) -> String {
 fn pascal(key: &str) -> String {
     let mut pascal = String::new();
     let mut capitalize = true;
+    // let mut upper_or_underscore_last = false;
     for ch in key.chars() {
         if ch == '_' {
             capitalize = true;
@@ -326,13 +343,14 @@ fn pascal(key: &str) -> String {
             pascal.push(ch.to_ascii_uppercase());
             capitalize = false;
         } else {
-            pascal.push(ch);
+            pascal.push(ch.to_ascii_lowercase());
         }
     }
     pascal
 }
 
-fn camel(pascal: &str) -> String {
+fn camel(key: &str) -> String {
+    let pascal = pascal(key);
     pascal[..1].to_ascii_lowercase() + &pascal[1..]
 }
 

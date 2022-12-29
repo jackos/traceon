@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 mod traceon;
-pub use crate::traceon::{KeyCase, LevelFormat, Traceon};
+pub use crate::traceon::{Case, LevelFormat, Traceon};
 
 pub use tracing;
 use tracing::subscriber::DefaultGuard;
