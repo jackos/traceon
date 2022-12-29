@@ -1,7 +1,7 @@
 # Traceon - trace on json
 An easy to use log and tracing formatter with a flattened json output, it only takes one line of code for good defaults, with an easy to use builder for configuration.
 
-The main purpose of this crate is to simplify the concept of `tracing`, which is just adding context to log messages for better debugging and observability, this documentation will cover everything you need, [but the detailed tracing docs are here](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/).
+The main purpose of this crate is to simplify the concept of `tracing`, which is just adding context to log messages for better debugging and observability, this documentation will cover everything you need, [but the detailed tracing docs are here](https://docs.rs/tracing/latest/tracing/).
 
 The only two crates you'll need in your `Cargo.toml` are:
 
@@ -112,7 +112,7 @@ name = "traceon"
 
 __IMPORTANT!__ if you're calling an async functions with `.await`, only use the above two methods to create a span, [more details here](https://docs.rs/tracing/latest/tracing/struct.Span.html#in-asynchronous-code) 
 
-#[examples/nested_spans.rs](examples/nested_spans.rs)
+[examples/nested_spans.rs](examples/nested_spans.rs)
 ### Nested spans
 To combine the output from the two examples above we can enter a span with the arguments added to the trace:
 ```rust
@@ -308,33 +308,33 @@ fn main() {
 ```json
 {
   "Level": 30,
-  "Timestamp": "2022-12-29T01:33:21.610638Z",
+  "Timestamp": "2022-12-29T03:51:55.640613Z",
   "Module": "casing",
   "File": "examples/casing.rs:6",
-  "ScreamingSnakeCase": "test",
   "SnakeCase": "test",
-  "Pascalcase": "test",
-  "Camelcase": "test"
+  "PascalCase": "test",
+  "CamelCase": "test",
+  "ScreamingSnakeCase": "test"
 }
 {
   "level": 30,
-  "timestamp": "2022-12-29T01:33:21.611067Z",
+  "timestamp": "2022-12-29T03:51:55.641014Z",
   "module": "casing",
   "file": "examples/casing.rs:16",
-  "snakeCase": "test",
-  "camelcase": "test",
-  "pascalcase": "test",
-  "screamingSnakeCase": "test"
+  "screamingSnakeCase": "test",
+  "pascalCase": "test",
+  "camelCase": "test",
+  "snakeCase": "test"
 }
 {
   "level": 30,
-  "timestamp": "2022-12-29T01:33:21.611246Z",
+  "timestamp": "2022-12-29T03:51:55.641204Z",
   "module": "casing",
   "file": "examples/casing.rs:27",
-  "pascal_case": "test",
-  "snake_case": "test",
   "screaming_snake_case": "test",
-  "camel_case": "test"
+  "camel_case": "test",
+  "snake_case": "test",
+  "pascal_case": "test"
 }
 ```
 

@@ -335,15 +335,23 @@ fn snake(key: &str) -> String {
 fn pascal(key: &str) -> String {
     let mut pascal = String::new();
     let mut capitalize = true;
-    // let mut upper_or_underscore_last = false;
+    let mut upper_last = false;
     for ch in key.chars() {
+        if ch.is_lowercase() {
+            upper_last = false;
+        }
         if ch == '_' {
             capitalize = true;
+            upper_last = false;
+        } else if upper_last {
+            pascal.push(ch.to_ascii_lowercase());
         } else if capitalize {
             pascal.push(ch.to_ascii_uppercase());
             capitalize = false;
+            upper_last = true;
         } else {
-            pascal.push(ch.to_ascii_lowercase());
+            pascal.push(ch);
+            upper_last = false;
         }
     }
     pascal
