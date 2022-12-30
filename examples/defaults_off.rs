@@ -1,8 +1,8 @@
 pub fn main() {
     traceon::json()
-        .default_fields(false)
-        .span(true)
-        .concat(None)
+        .with_default_fields(false)
+        .with_span_name(true)
+        .with_concat(None)
         .on();
     let _span = tracing::info_span!("level_1").entered();
     tracing::info!("span field is on");

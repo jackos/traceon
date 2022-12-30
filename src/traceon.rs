@@ -1,6 +1,7 @@
 use nu_ansi_term::{Color, Style};
 // use erased_serde::{Serialize, Serializer};
 use serde::ser::{SerializeMap, Serializer};
+use serde_json::Value;
 use std::{
     collections::HashMap,
     io::Write,
@@ -26,7 +27,6 @@ pub struct Traceon {
     level: LevelFormat,
     case: Case,
     pretty: bool,
-    color: bool,
 }
 
 #[derive(Clone)]
@@ -45,6 +45,15 @@ pub enum LevelFormat {
     Number,
 }
 
+/// Convert json values with \n and \" characters to their escaped values when in pretty mode
+pub fn clean_json_value(value: &Value) -> String {
+    value
+        .to_string()
+        .trim_matches('"')
+        .replace("\\\"", "\"")
+        .replace("\\n", "\n    ")
+}
+
 impl Default for Traceon {
     #[must_use]
     fn default() -> Traceon {
@@ -56,7 +65,6 @@ impl Default for Traceon {
             timestamp: true,
             module: true,
             pretty: false,
-            color: false,
             case: Case::None,
             level: crate::LevelFormat::Number,
         }
@@ -74,9 +82,8 @@ impl Traceon {
             timestamp: true,
             module: true,
             pretty: true,
-            color: false,
             case: Case::None,
-            level: crate::LevelFormat::Lowercase,
+            level: crate::LevelFormat::Uppercase,
         }
     }
     /// Turn the file field on or off
@@ -87,8 +94,8 @@ impl Traceon {
     ///
     /// ```json
     /// {
-    /// 	"message": "file field on",
-    /// 	"file": "src/traceon.rs:68"
+    ///     "message": "file field on",
+    ///     "file": "src/traceon.rs:68"
     /// }
     /// ```
     #[must_use]
@@ -145,15 +152,15 @@ impl Traceon {
     ///
     /// ```json
     /// {
-    ///		"message": "span field is on",
-    ///		"span": "level_1"
-    ///	}
+    ///        "message": "span field is on",
+    ///        "span": "level_1"
+    ///    }
     /// ```
     /// ```json
-    ///	{
-    ///		"message": "span field is on",
-    ///		"span": "level_1::level_2"
-    ///	}
+    ///    {
+    ///        "message": "span field is on",
+    ///        "span": "level_1::level_2"
+    ///    }
     /// ```
     ///
     /// To turn of concatenation of span fields:
@@ -171,15 +178,15 @@ impl Traceon {
     ///
     /// ```json
     /// {
-    ///		"message": "span field is on",
-    ///		"span": "level_1"
-    ///	}
+    ///        "message": "span field is on",
+    ///        "span": "level_1"
+    ///    }
     /// ```
     /// ```json
-    ///	{
-    ///		"message": "span field is on",
-    ///		"span": "level_2"
-    ///	}
+    ///    {
+    ///        "message": "span field is on",
+    ///        "span": "level_2"
+    ///    }
     /// ```
     ///
     #[must_use]
@@ -210,11 +217,6 @@ impl Traceon {
     #[must_use]
     pub fn timestamp(&mut self, on: bool) -> &mut Self {
         self.timestamp = on;
-        self
-    }
-    #[must_use]
-    pub fn color_message(&mut self, on: bool) -> &mut Self {
-        self.color = on;
         self
     }
     #[must_use]
@@ -259,6 +261,18 @@ impl Traceon {
 
         tracing::subscriber::set_default(subscriber)
     }
+
+    pub fn format_field(
+        &self,
+        key: &str,
+        value: &str,
+        buffer: &mut Vec<u8>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if self.pretty && key != "message" {
+            writeln!(buffer, "{}: {}", key, value)?;
+        };
+        Ok(())
+    }
     /// Serialize a single event
     fn serialize<S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>>(
         &self,
@@ -289,16 +303,14 @@ impl Traceon {
                 if let Ok(time) = &time::OffsetDateTime::now_utc().format(&pretty_time) {
                     write!(msg, "{time} ")?;
                 }
-            } else {
-                if let Ok(time) = &time::OffsetDateTime::now_utc().format(&Rfc3339) {
-                    map_serializer.serialize_entry(timestamp_key, time)?;
-                }
+            } else if let Ok(time) = &time::OffsetDateTime::now_utc().format(&Rfc3339) {
+                map_serializer.serialize_entry(timestamp_key, time)?;
             }
         }
         match self.level {
             LevelFormat::Uppercase => {
                 if self.pretty {
-                    write!(msg, "{} ", metadata.level().to_string())?;
+                    write!(msg, "{} ", metadata.level())?;
                 } else {
                     map_serializer.serialize_entry(level_key, &metadata.level().to_string())?;
                 }
@@ -336,15 +348,6 @@ impl Traceon {
         }
         // let x = d.format(&format).expect("Failed to format the time");
 
-        if self.module {
-            if self.pretty {
-                write!(msg, "[{}] ", &metadata.module_path().unwrap_or(""))?;
-            } else {
-                map_serializer
-                    .serialize_entry(module_key, metadata.module_path().unwrap_or_default())?;
-            }
-        }
-
         if self.pretty {
             let style = match event.metadata().level().as_log() {
                 log::Level::Trace => Style::new().fg(Color::Purple),
@@ -354,27 +357,43 @@ impl Traceon {
                 log::Level::Error => Style::new().fg(Color::Red),
             };
 
-            if let Some(message) = event_visitor.values.get("message") {
-                let message = message.to_string();
-                let message = message.trim_matches('"');
-                write!(msg, "{}", message.to_string())?;
+            if let Some(value) = event_visitor.values.get("message") {
+                let message = clean_json_value(value);
+                write!(msg, "{message}")?;
             } else {
                 write!(msg, "event triggered")?;
             };
             let msg = String::from_utf8_lossy(&msg);
             let msg = msg.trim();
-            write!(pretty_buffer, "{}\n", style.paint(msg))?;
+            writeln!(pretty_buffer, "{}", style.paint(msg))?;
+        }
+
+        let mut fields = Vec::new();
+
+        if self.module {
+            if self.pretty {
+                fields.push((
+                    module_key.to_string(),
+                    metadata.module_path().unwrap_or_default().to_string(),
+                ));
+            } else {
+                map_serializer
+                    .serialize_entry(module_key, metadata.module_path().unwrap_or_default())?;
+            }
         }
 
         if self.file {
-            map_serializer.serialize_entry(
-                file_key,
-                &format!(
-                    "{}:{}",
-                    metadata.file().unwrap_or_default(),
-                    metadata.line().unwrap_or_default()
-                ),
-            )?;
+            let value = format!(
+                "{}:{}",
+                metadata.file().unwrap_or_default(),
+                metadata.line().unwrap_or_default()
+            );
+
+            if self.pretty {
+                fields.push((file_key.to_string(), value.to_string()));
+            } else {
+                map_serializer.serialize_entry(file_key, &value)?;
+            }
         }
 
         // Add all the fields from the current event.
@@ -387,12 +406,9 @@ impl Traceon {
             };
 
             if self.pretty {
-                write!(
-                    pretty_buffer,
-                    "    {}: {}\n",
-                    &key,
-                    value.to_string().replace("\\\"", "\"").trim_matches('"')
-                )?;
+                if key != "message" {
+                    fields.push((key.to_string(), clean_json_value(value)));
+                }
             } else {
                 map_serializer.serialize_entry(&key, value)?;
             }
@@ -411,16 +427,30 @@ impl Traceon {
                     };
 
                     if self.pretty {
-                        write!(
-                            pretty_buffer,
-                            "    {}: {}\n",
-                            &key,
-                            value.to_string().replace("\\\"", "\"").trim_matches('"')
-                        )?;
+                        if key != "message" {
+                            fields.push((key.to_string(), clean_json_value(value)));
+                        }
                     } else {
                         map_serializer.serialize_entry(&key, value)?;
                     }
                 }
+            }
+        }
+        if self.pretty {
+            fields.sort_by(|a, b| a.0.cmp(&b.0));
+            let mut max_len = 0;
+            for field in &fields {
+                if field.0.len() > max_len {
+                    max_len = field.0.len();
+                }
+            }
+            for field in fields {
+                let mut seperator = ": ".to_string();
+                let spaces = max_len - field.0.len();
+                for _ in 0..spaces {
+                    seperator += " ";
+                }
+                writeln!(pretty_buffer, "    {}{}{}", field.0, seperator, field.1)?;
             }
         }
         map_serializer.end()?;

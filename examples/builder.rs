@@ -1,4 +1,3 @@
-use traceon::LevelFormat;
 use tracing::Level;
 
 mod math {
@@ -10,6 +9,7 @@ mod math {
 fn main() {
     traceon::pretty().on();
 
+    tracing::info!("single message nothing here");
     let five = 5;
     let _span = tracing::info_span!("cool", five).entered();
     tracing::info!("only this message and level as text");
@@ -23,7 +23,7 @@ fn main() {
     tracing::event!(
         Level::WARN,
         message = "add message field, and debug a vector",
-        ?vector,
+        vector = format!("{:#?}", vector),
     );
 
     math::add();

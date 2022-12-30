@@ -7,8 +7,8 @@ fn bench_traceon(c: &mut Criterion) {
 
     group.bench_function("traceon", |b| {
         let _guard = traceon::json()
-            .file(false)
-            .writer(std::io::sink())
+            .with_filepath(false)
+            .with_writer(std::io::sink())
             .on_thread();
         b.iter(|| {
             black_box(tracing::info!("testing out a resonably long string"));

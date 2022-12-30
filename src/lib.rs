@@ -1,7 +1,5 @@
 #![doc = include_str!("../README.md")]
 mod traceon;
-use std::sync::{Arc, Mutex};
-
 pub use crate::traceon::{Case, LevelFormat, Traceon};
 
 pub use tracing;
@@ -14,19 +12,19 @@ use tracing_subscriber::{EnvFilter, Registry};
 /// ```
 /// use traceon::{LevelFormat, Case};
 /// traceon::builder()
-/// 	// Turn off the default fields
-/// 	.file(false)
-/// 	.span(false)
-/// 	.module(false)
-/// 	.timestamp(false)
-/// 	// Set the log level to text instead of numbers
-/// 	.level(LevelFormat::Lowercase)
-/// 	// Rename the json keys to match a case
-/// 	.case(Case::Snake)
-/// 	// Concatentate fields that are repeated in nested spans, or turn off with ""
-/// 	.concat(Some("::"))
-/// 	// Send output to anything that implements `std::io::Write`
-/// 	.writer(std::io::stderr());
+///     // Turn off the default fields
+///     .file(false)
+///     .span(false)
+///     .module(false)
+///     .timestamp(false)
+///     // Set the log level to text instead of numbers
+///     .level(LevelFormat::Lowercase)
+///     // Rename the json keys to match a case
+///     .case(Case::Snake)
+///     // Concatentate fields that are repeated in nested spans, or turn off with ""
+///     .concat(Some("::"))
+///     // Send output to anything that implements `std::io::Write`
+///     .writer(std::io::stderr());
 /// ```
 #[must_use]
 pub fn json() -> Traceon {
