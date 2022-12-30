@@ -148,7 +148,7 @@ async fn main() {
 You can see above that the child span name `add` was concatenated to the parent span name `math_functions` with the characters `::`, if you prefer the span just overrides the parent you can turn this functionality off:
 ```rust
 fn main() {
-	traceon::builder().concat("").on();
+	traceon::builder().concat(None).on();
 }
 ```
 ```json
@@ -160,7 +160,7 @@ fn main() {
 or set it to something different:
 ```rust
 fn main() {
-	traceon::builder().concat(">").on();
+	traceon::builder().concat(Some(">")).on();
 }
 ```
 
@@ -272,7 +272,7 @@ use traceon::Case;
 use tracing::Level;
 fn main() {
     {
-        let _guard = traceon::builder().key_case(Case::Pascal).on_thread();
+        let _guard = traceon::builder().case(Case::Pascal).on_thread();
         tracing::event!(
             Level::INFO,
             PascalCase = "test",
@@ -282,7 +282,7 @@ fn main() {
         );
     }
     {
-        let _guard = traceon::builder().key_case(Case::Camel).on_thread();
+        let _guard = traceon::builder().case(Case::Camel).on_thread();
         tracing::event!(
             Level::INFO,
             PascalCase = "test",
@@ -292,7 +292,7 @@ fn main() {
         );
     }
     {
-        let _guard = traceon::builder().key_case(Case::Snake).on_thread();
+        let _guard = traceon::builder().case(Case::Snake).on_thread();
 
         tracing::event!(
             Level::INFO,

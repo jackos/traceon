@@ -2,7 +2,7 @@ use traceon::Case;
 use tracing::Level;
 fn main() {
     {
-        let _guard = traceon::builder().key_case(Case::Pascal).on_thread();
+        let _guard = traceon::json().case(Case::Pascal).on_thread();
         tracing::event!(
             Level::INFO,
             PascalCase = "test",
@@ -12,7 +12,7 @@ fn main() {
         );
     }
     {
-        let _guard = traceon::builder().key_case(Case::Camel).on_thread();
+        let _guard = traceon::json().case(Case::Camel).on_thread();
         tracing::event!(
             Level::INFO,
             PascalCase = "test",
@@ -22,7 +22,7 @@ fn main() {
         );
     }
     {
-        let _guard = traceon::builder().key_case(Case::Snake).on_thread();
+        let _guard = traceon::json().case(Case::Snake).on_thread();
 
         tracing::event!(
             Level::INFO,

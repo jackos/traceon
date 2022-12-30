@@ -1,9 +1,12 @@
 # Changelog
-## [0.1.7] - 2022-12-28
+## [0.1.8] - 2022-12-29
+- Fix span concatenation not turning off correctly
+
+## [0.1.7] - 2022-12-29
 - Fix casing functionality and docs
 - Fix tracing link
 
-## [0.1.6] - 2022-12-28
+## [0.1.6] - 2022-12-29
 - Improve documentation and examples
 - Fix casing on SCREAMING_CASE 
 

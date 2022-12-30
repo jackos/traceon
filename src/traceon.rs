@@ -1,3 +1,5 @@
+use nu_ansi_term::{Color, Style};
+// use erased_serde::{Serialize, Serializer};
 use serde::ser::{SerializeMap, Serializer};
 use std::{
     collections::HashMap,
@@ -15,14 +17,16 @@ use tracing_subscriber::{
 
 #[derive(Clone)]
 pub struct Traceon {
-    pub writer: Arc<Mutex<dyn Write + Sync + Send>>,
-    pub file: bool,
-    pub module: bool,
-    pub span: bool,
-    pub time: bool,
-    pub concat: String,
-    pub level: LevelFormat,
-    pub case: Case,
+    writer: Arc<Mutex<dyn Write + Sync + Send>>,
+    file: bool,
+    module: bool,
+    span: bool,
+    timestamp: bool,
+    concat: Option<String>,
+    level: LevelFormat,
+    case: Case,
+    pretty: bool,
+    color: bool,
 }
 
 #[derive(Clone)]
@@ -46,11 +50,13 @@ impl Default for Traceon {
     fn default() -> Traceon {
         Traceon {
             writer: Arc::new(Mutex::new(std::io::stdout())),
-            concat: "".into(),
+            concat: Some("::".into()),
             file: true,
             span: true,
-            time: true,
+            timestamp: true,
             module: true,
+            pretty: false,
+            color: false,
             case: Case::None,
             level: crate::LevelFormat::Number,
         }
@@ -58,35 +64,162 @@ impl Default for Traceon {
 }
 
 impl Traceon {
-    /// Set the writer with defaults and returns a instance of Traceon
+    #[must_use]
+    pub fn pretty() -> Self {
+        Traceon {
+            writer: Arc::new(Mutex::new(std::io::stdout())),
+            concat: Some("::".into()),
+            file: true,
+            span: true,
+            timestamp: true,
+            module: true,
+            pretty: true,
+            color: false,
+            case: Case::None,
+            level: crate::LevelFormat::Lowercase,
+        }
+    }
+    /// Turn the file field on or off
+    /// ```
+    /// traceon::builder().default_fields(false).file(true).on();
+    /// tracing::info!("file field on");
+    /// ```
+    ///
+    /// ```json
+    /// {
+    /// 	"message": "file field on",
+    /// 	"file": "src/traceon.rs:68"
+    /// }
+    /// ```
     #[must_use]
     pub fn file(&mut self, on: bool) -> &mut Self {
         self.file = on;
         self
     }
+
+    /// Turn the default fields on or off
+    /// ```
+    /// traceon::builder().default_fields(true).on();
+    /// tracing::info!("default fields on");
+    /// ```
+    ///
+    /// output:
+    ///
+    /// ```json
+    /// {
+    ///   "level": 30,
+    ///   "timestamp": "2022-12-29T04:14:15.672619Z",
+    ///   "module": "traceon",
+    ///   "file": "src/traceon.rs:85",
+    ///   "message": "default fields on"
+    /// }
+    /// ```
+    #[must_use]
+    pub fn default_fields(&mut self, on: bool) -> &mut Self {
+        if on {
+            self.file = true;
+            self.module = true;
+            self.span = true;
+            self.timestamp = true;
+            self.level = LevelFormat::Number
+        } else {
+            self.file = false;
+            self.module = false;
+            self.span = false;
+            self.timestamp = false;
+            self.level = LevelFormat::Off
+        }
+        self
+    }
+    /// Turn span fields on or off
+    /// ```
+    /// traceon::builder().default_fields(false).span(true).on();
+    /// let _span = tracing::info_span!("level_1").entered();
+    /// tracing::info!("span field is on");
+    ///
+    /// let _span = tracing::info_span!("level_2").entered();
+    /// tracing::info!("span field is on");
+    /// ```
+    ///
+    /// output:
+    ///
+    /// ```json
+    /// {
+    ///		"message": "span field is on",
+    ///		"span": "level_1"
+    ///	}
+    /// ```
+    /// ```json
+    ///	{
+    ///		"message": "span field is on",
+    ///		"span": "level_1::level_2"
+    ///	}
+    /// ```
+    ///
+    /// To turn of concatenation of span fields:
+    ///
+    /// ```
+    /// traceon::builder().default_fields(false).span(true).concat(None).on();
+    /// let _span = tracing::info_span!("level_1").entered();
+    /// tracing::info!("span field is on");
+    ///
+    /// let _span = tracing::info_span!("level_2").entered();
+    /// tracing::info!("span field is on");
+    /// ```
+    ///
+    /// output:
+    ///
+    /// ```json
+    /// {
+    ///		"message": "span field is on",
+    ///		"span": "level_1"
+    ///	}
+    /// ```
+    /// ```json
+    ///	{
+    ///		"message": "span field is on",
+    ///		"span": "level_2"
+    ///	}
+    /// ```
+    ///
     #[must_use]
     pub fn span(&mut self, on: bool) -> &mut Self {
         self.span = on;
         self
     }
+
+    /// Turn module on or off
+    /// ```
+    /// traceon::builder().default_fields(false).module(true).on();
+    /// let traceon =
+    /// ```
     #[must_use]
     pub fn module(&mut self, on: bool) -> &mut Self {
         self.module = on;
         self
     }
     #[must_use]
-    pub fn concat(&mut self, concat: &str) -> &mut Self {
-        self.concat = concat.to_string();
+    pub fn concat(&mut self, concat: Option<&str>) -> &mut Self {
+        if let Some(concat) = concat {
+            self.concat = Some(concat.to_string());
+        } else {
+            self.concat = None;
+        }
         self
     }
     #[must_use]
     pub fn timestamp(&mut self, on: bool) -> &mut Self {
-        self.time = on;
+        self.timestamp = on;
         self
     }
     #[must_use]
-    pub fn level(&mut self, level_type: LevelFormat) -> &mut Self {
-        self.level = level_type;
+    pub fn color_message(&mut self, on: bool) -> &mut Self {
+        self.color = on;
+        self
+    }
+    #[must_use]
+    pub fn level(&mut self, level_format: LevelFormat) -> &mut Self {
+        self.level = level_format;
         self
     }
     #[must_use]
@@ -95,8 +228,8 @@ impl Traceon {
         self
     }
     #[must_use]
-    pub fn key_case(&mut self, key_case: Case) -> &mut Self {
-        self.case = key_case;
+    pub fn case(&mut self, case: Case) -> &mut Self {
+        self.case = case;
         self
     }
 
@@ -126,6 +259,177 @@ impl Traceon {
 
         tracing::subscriber::set_default(subscriber)
     }
+    /// Serialize a single event
+    fn serialize<S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>>(
+        &self,
+        event: &Event<'_>,
+        ctx: Context<'_, S>,
+        event_visitor: &mut JsonStorage,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let mut msg = Vec::new();
+        let mut pretty_buffer = Vec::new();
+        let mut json_buffer = Vec::new();
+
+        let mut serializer = serde_json::Serializer::new(&mut json_buffer);
+        let mut map_serializer = serializer.serialize_map(None)?;
+        let current_span = ctx.lookup_current();
+        event.record(event_visitor);
+
+        let (level_key, file_key, module_key, timestamp_key) = match self.case {
+            Case::Pascal => ("Level", "File", "Module", "Timestamp"),
+            _ => ("level", "file", "module", "timestamp"),
+        };
+
+        let metadata = event.metadata();
+
+        use time::macros::format_description;
+        if self.timestamp {
+            if self.pretty {
+                let pretty_time = format_description!("[hour]:[minute]:[second]");
+                if let Ok(time) = &time::OffsetDateTime::now_utc().format(&pretty_time) {
+                    write!(msg, "{time} ")?;
+                }
+            } else {
+                if let Ok(time) = &time::OffsetDateTime::now_utc().format(&Rfc3339) {
+                    map_serializer.serialize_entry(timestamp_key, time)?;
+                }
+            }
+        }
+        match self.level {
+            LevelFormat::Uppercase => {
+                if self.pretty {
+                    write!(msg, "{} ", metadata.level().to_string())?;
+                } else {
+                    map_serializer.serialize_entry(level_key, &metadata.level().to_string())?;
+                }
+            }
+            LevelFormat::Lowercase => {
+                if self.pretty {
+                    write!(
+                        msg,
+                        "{} ",
+                        metadata.level().to_string().to_ascii_lowercase()
+                    )?;
+                } else {
+                    map_serializer.serialize_entry(
+                        level_key,
+                        &metadata.level().to_string().to_ascii_lowercase(),
+                    )?;
+                }
+            }
+            LevelFormat::Number => {
+                let number = match metadata.level().as_log() {
+                    log::Level::Error => 50u16,
+                    log::Level::Warn => 40,
+                    log::Level::Info => 30,
+                    log::Level::Debug => 20,
+                    log::Level::Trace => 10,
+                };
+
+                if self.pretty {
+                    write!(msg, "{} ", number)?;
+                } else {
+                    map_serializer.serialize_entry(level_key, &number)?;
+                }
+            }
+            LevelFormat::Off => (),
+        }
+        // let x = d.format(&format).expect("Failed to format the time");
+
+        if self.module {
+            if self.pretty {
+                write!(msg, "[{}] ", &metadata.module_path().unwrap_or(""))?;
+            } else {
+                map_serializer
+                    .serialize_entry(module_key, metadata.module_path().unwrap_or_default())?;
+            }
+        }
+
+        if self.pretty {
+            let style = match event.metadata().level().as_log() {
+                log::Level::Trace => Style::new().fg(Color::Purple),
+                log::Level::Debug => Style::new().fg(Color::Blue),
+                log::Level::Info => Style::new().fg(Color::Green),
+                log::Level::Warn => Style::new().fg(Color::Yellow),
+                log::Level::Error => Style::new().fg(Color::Red),
+            };
+
+            if let Some(message) = event_visitor.values.get("message") {
+                let message = message.to_string();
+                let message = message.trim_matches('"');
+                write!(msg, "{}", message.to_string())?;
+            } else {
+                write!(msg, "event triggered")?;
+            };
+            let msg = String::from_utf8_lossy(&msg);
+            let msg = msg.trim();
+            write!(pretty_buffer, "{}\n", style.paint(msg))?;
+        }
+
+        if self.file {
+            map_serializer.serialize_entry(
+                file_key,
+                &format!(
+                    "{}:{}",
+                    metadata.file().unwrap_or_default(),
+                    metadata.line().unwrap_or_default()
+                ),
+            )?;
+        }
+
+        // Add all the fields from the current event.
+        for (key, value) in event_visitor.values.iter() {
+            let key = match self.case {
+                Case::Snake => snake(key),
+                Case::Pascal => pascal(key),
+                Case::Camel => camel(key),
+                Case::None => key.to_string(),
+            };
+
+            if self.pretty {
+                write!(
+                    pretty_buffer,
+                    "    {}: {}\n",
+                    &key,
+                    value.to_string().replace("\\\"", "\"").trim_matches('"')
+                )?;
+            } else {
+                map_serializer.serialize_entry(&key, value)?;
+            }
+        }
+
+        // Add all the fields from the current span, if we have one.
+        if let Some(span) = &current_span {
+            let extensions = span.extensions();
+            if let Some(visitor) = extensions.get::<JsonStorage>() {
+                for (key, value) in &visitor.values {
+                    let key = match self.case {
+                        Case::Snake => snake(key),
+                        Case::Pascal => pascal(key),
+                        Case::Camel => camel(key),
+                        Case::None => key.to_string(),
+                    };
+
+                    if self.pretty {
+                        write!(
+                            pretty_buffer,
+                            "    {}: {}\n",
+                            &key,
+                            value.to_string().replace("\\\"", "\"").trim_matches('"')
+                        )?;
+                    } else {
+                        map_serializer.serialize_entry(&key, value)?;
+                    }
+                }
+            }
+        }
+        map_serializer.end()?;
+        if self.pretty {
+            Ok(pretty_buffer)
+        } else {
+            Ok(json_buffer)
+        }
+    }
 }
 
 impl<S> Layer<S> for Traceon
@@ -133,107 +437,15 @@ where
     S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
 {
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
-        let current_span = ctx.lookup_current();
-
         let mut event_visitor = JsonStorage::new(self.concat.clone());
-        event.record(&mut event_visitor);
-
-        // Closure allows use of the ? syntax
-        let format = || {
-            let (level_key, file_key, module_key, timestamp_key) = match self.case {
-                Case::Pascal => ("Level", "File", "Module", "Timestamp"),
-                _ => ("level", "file", "module", "timestamp"),
-            };
-
-            let mut buffer = Vec::new();
-
-            let mut serializer = serde_json::Serializer::new(&mut buffer);
-            let mut map_serializer = serializer.serialize_map(None)?;
-
-            let metadata = event.metadata();
-            match self.level {
-                LevelFormat::Uppercase => {
-                    map_serializer.serialize_entry(level_key, &metadata.level().to_string())?;
-                }
-                LevelFormat::Lowercase => {
-                    map_serializer.serialize_entry(
-                        level_key,
-                        &metadata.level().to_string().to_ascii_lowercase(),
-                    )?;
-                }
-                LevelFormat::Number => {
-                    let number = match metadata.level().as_log() {
-                        log::Level::Error => 50u16,
-                        log::Level::Warn => 40,
-                        log::Level::Info => 30,
-                        log::Level::Debug => 20,
-                        log::Level::Trace => 10,
-                    };
-
-                    map_serializer.serialize_entry(level_key, &number)?;
-                }
-                LevelFormat::Off => (),
+        match self.serialize(event, ctx, &mut event_visitor) {
+            Ok(mut buffer) => {
+                buffer.write_all(b"\n").unwrap();
+                self.writer.lock().unwrap().write_all(&buffer).unwrap();
             }
-            if self.time {
-                if let Ok(time) = &time::OffsetDateTime::now_utc().format(&Rfc3339) {
-                    map_serializer.serialize_entry(timestamp_key, time)?;
-                }
+            Err(e) => {
+                dbg!(e);
             }
-            if self.module {
-                map_serializer
-                    .serialize_entry(module_key, metadata.module_path().unwrap_or_default())?;
-            }
-
-            if self.file {
-                map_serializer.serialize_entry(
-                    file_key,
-                    &format!(
-                        "{}:{}",
-                        metadata.file().unwrap_or_default(),
-                        metadata.line().unwrap_or_default()
-                    ),
-                )?;
-            }
-
-            // Add all the fields from the current event.
-            for (key, value) in event_visitor.values.iter() {
-                let key = match self.case {
-                    Case::Snake => snake(key),
-                    Case::Pascal => pascal(key),
-                    Case::Camel => camel(key),
-                    Case::None => key.to_string(),
-                };
-
-                map_serializer.serialize_entry(&key, value)?;
-            }
-
-            // Add all the fields from the current span, if we have one.
-            if let Some(span) = &current_span {
-                let extensions = span.extensions();
-                if let Some(visitor) = extensions.get::<JsonStorage>() {
-                    for (key, value) in &visitor.values {
-                        let key = match self.case {
-                            Case::Snake => snake(key),
-                            Case::Pascal => pascal(key),
-                            Case::Camel => camel(key),
-                            Case::None => key.to_string(),
-                        };
-
-                        map_serializer.serialize_entry(&key, value)?;
-                    }
-                }
-            }
-            map_serializer.end()?;
-            Ok(buffer)
-        };
-
-        let result: std::io::Result<Vec<u8>> = format();
-        if let Err(e) = &result {
-            dbg!(e);
-        }
-        if let Ok(mut formatted) = result {
-            formatted.write_all(b"\n").unwrap();
-            self.writer.lock().unwrap().write_all(&formatted).unwrap();
         }
     }
 
@@ -252,21 +464,17 @@ where
                 .map(|v| v.to_owned())
                 .unwrap_or_default();
             if self.span {
-                if let Some(orig) = storage.values.insert(
-                    span_key,
-                    serde_json::Value::from(format!(
-                        "{}::{}",
-                        parent_span.metadata().name(),
-                        span.metadata().name()
-                    )),
-                ) {
-                    if self.concat != "" {
+                if let Some(orig) = storage
+                    .values
+                    .insert(span_key, serde_json::Value::from(span.metadata().name()))
+                {
+                    if let Some(concat) = &self.concat {
                         storage.values.insert(
                             span_key,
                             serde_json::Value::from(format!(
                                 "{}{}{}",
                                 orig.as_str().unwrap_or(""),
-                                self.concat,
+                                concat,
                                 span.metadata().name()
                             )),
                         );
@@ -303,11 +511,11 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct JsonStorage<'a> {
     pub values: HashMap<&'a str, serde_json::Value>,
-    pub concat: String,
+    pub concat: Option<String>,
 }
 
 impl<'a> JsonStorage<'a> {
-    pub fn new(concat: String) -> Self {
+    pub fn new(concat: Option<String>) -> Self {
         JsonStorage {
             values: HashMap::new(),
             concat,
@@ -384,9 +592,10 @@ impl Visit for JsonStorage<'_> {
             .values
             .insert(field.name(), serde_json::Value::from(value))
         {
-            if self.concat != "" {
+            // If self.concat is Some(_), instead of replacing value concatenate it
+            if let Some(concat) = &self.concat {
                 let orig = orig.as_str().unwrap_or("");
-                let new = format!("{orig}{}{value}", self.concat);
+                let new = format!("{orig}{}{value}", concat);
                 self.values
                     .insert(field.name(), serde_json::Value::from(new));
             }

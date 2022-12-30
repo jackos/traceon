@@ -19,7 +19,7 @@ lazy_static! {
 fn run_and_get_raw_output<F: Fn()>(action: F) -> String {
     let mut default_fields = HashMap::new();
     default_fields.insert("custom_field".to_string(), json!("custom_value"));
-    let traceon = traceon::builder();
+    let traceon = traceon::json();
     let subscriber = Registry::default().with(traceon);
     tracing::subscriber::with_default(subscriber, action);
 

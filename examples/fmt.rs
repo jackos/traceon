@@ -1,14 +1,9 @@
-use traceon::LevelFormat;
+//! This example is not related to traceon, it's just an example using tracing_subscribers
+//! default builder that is an alternate to traceon
 use tracing::Level;
 
-mod math {
-    pub fn add() {
-        tracing::info!("inside a module");
-    }
-}
-
 fn main() {
-    traceon::pretty().on();
+    tracing_subscriber::fmt().pretty().init();
 
     let five = 5;
     let _span = tracing::info_span!("cool", five).entered();
@@ -25,6 +20,4 @@ fn main() {
         message = "add message field, and debug a vector",
         ?vector,
     );
-
-    math::add();
 }

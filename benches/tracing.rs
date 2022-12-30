@@ -6,7 +6,7 @@ fn bench_traceon(c: &mut Criterion) {
     let mut group = c.benchmark_group("traceon");
 
     group.bench_function("traceon", |b| {
-        let _guard = traceon::builder()
+        let _guard = traceon::json()
             .file(false)
             .writer(std::io::sink())
             .on_thread();
