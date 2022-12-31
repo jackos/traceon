@@ -331,23 +331,20 @@ fn main() {
 }
 ```
 
-<style type="text/css">
-span{color:green;}
-</style>
 <pre>
-<span>2022-12-31T04:12:37.132Z INFO event triggered</span>
+<span style="color: green;">2022-12-31T04:12:37.132Z INFO event triggered</span>
     CamelCase:          test
     PascalCase:         test
     ScreamingSnakeCase: test
     SnakeCase:          test
 
-<span>2022-12-31T04:12:37.132Z INFO event triggered</span>
+<span style="color: green;">2022-12-31T04:12:37.132Z INFO event triggered</span>
     camelCase:          test
     pascalCase:         test
     screamingSnakeCase: test
     snakeCase:          test
 
-<span>2022-12-31T04:12:37.133Z INFO event triggered</span>
+<span style="color: green;">2022-12-31T04:12:37.133Z INFO event triggered</span>
     camel_case:           test
     pascal_case:          test
     screaming_snake_case: test
