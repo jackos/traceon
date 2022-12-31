@@ -331,7 +331,7 @@ fn main() {
 }
 ```
 
-<style>
+<style type="text/css">
 span{color:green;}
 </style>
 <pre>
