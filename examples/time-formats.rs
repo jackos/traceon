@@ -16,5 +16,5 @@ fn main() {
         .time(TimeFormat::EpochSeconds)
         .json()
         .on_thread();
-    tracing::info!("number of seconds that have elapsed since 00:00:00 UTC on 1 January 1970");
+    tracing::info!("number of seconds that have elapsed since 1970-01-01 00:00:00 utc");
 }

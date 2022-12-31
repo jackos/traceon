@@ -302,40 +302,67 @@ Often you'll be consuming different crates that implement their own traces and y
 use traceon::Case;
 use tracing::Level;
 fn main() {
-    {
-        let _guard = traceon::builder().case(Case::Pascal).on_thread();
-        tracing::event!(
-            Level::INFO,
-            PascalCase = "test",
-            camelCase = "test",
-            snake_case = "test",
-            SCREAMING_SNAKE_CASE = "test",
-        );
-    }
-    {
-        let _guard = traceon::builder().case(Case::Camel).on_thread();
-        tracing::event!(
-            Level::INFO,
-            PascalCase = "test",
-            camelCase = "test",
-            snake_case = "test",
-            SCREAMING_SNAKE_CASE = "test",
-        );
-    }
-    {
-        let _guard = traceon::builder().case(Case::Snake).on_thread();
+	let _guard = traceon::builder().case(Case::Pascal).on_thread();
+	tracing::event!(
+		Level::INFO,
+		PascalCase = "test",
+		camelCase = "test",
+		snake_case = "test",
+		SCREAMING_SNAKE_CASE = "test",
+	);
 
-        tracing::event!(
-            Level::INFO,
-            PascalCase = "test",
-            camelCase = "test",
-            snake_case = "test",
-            SCREAMING_SNAKE_CASE = "test",
-        );
-    }
+	let _guard = traceon::builder().case(Case::Camel).on_thread();
+	tracing::event!(
+		Level::INFO,
+		PascalCase = "test",
+		camelCase = "test",
+		snake_case = "test",
+		SCREAMING_SNAKE_CASE = "test",
+	);
+
+	let _guard = traceon::builder().case(Case::Snake).on_thread();
+	tracing::event!(
+		Level::INFO,
+		PascalCase = "test",
+		camelCase = "test",
+		snake_case = "test",
+		SCREAMING_SNAKE_CASE = "test",
+	);
 }
-
 ```
+
+<style type="text/css">
+.ansi2html-content { display: inline; white-space: pre-wrap; word-wrap: break-word; }
+.body_foreground { color: #AAAAAA; }
+.body_background { background-color: #000000; }
+.inv_foreground { color: #000000; }
+.inv_background { background-color: #AAAAAA; }
+.ansi32 { color: #00aa00; }
+</style>
+</head>
+<body class="body_foreground body_background" style="font-size: normal;" >
+<pre class="ansi2html-content">
+<span class="ansi32">2022-12-31T04:12:37.132Z INFO event triggered</span>
+    CamelCase:          test
+    PascalCase:         test
+    ScreamingSnakeCase: test
+    SnakeCase:          test
+
+<span class="ansi32">2022-12-31T04:12:37.132Z INFO event triggered</span>
+    camelCase:          test
+    pascalCase:         test
+    screamingSnakeCase: test
+    snakeCase:          test
+
+<span class="ansi32">2022-12-31T04:12:37.133Z INFO event triggered</span>
+    camel_case:           test
+    pascal_case:          test
+    screaming_snake_case: test
+    snake_case:           test
+
+
+</pre>
+
 ```json
 {
   "Level": 30,

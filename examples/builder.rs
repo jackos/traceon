@@ -1,4 +1,3 @@
-use traceon::LevelFormat::Uppercase;
 use tracing::Level;
 
 mod math {
