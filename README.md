@@ -13,7 +13,7 @@ traceon = "0.1"
 And you can write your first trace with:
 ```rust
 fn main() {
-    traceon::on();
+    traceon::json();
     tracing::info!("a simple message");
 }
 ```
@@ -26,6 +26,37 @@ Which will give the default output of (this is configurable):
   "file": "src/main.rs:14"
 }
 ```
+Or you can use the pretty defaults:
+```rust
+traceon::pretty();
+```
+```
+22:22:03 INFO a simple message
+    file:   examples/builder.rs:19
+    module: builder
+```
+Or you can use the builder to create your own format:
+
+```rust
+use traceon::{TimeFormat, TimeZone, LevelFormat}
+traceon::builder()
+	// Source code filename and line number `src/main.rs::10`
+    file(),
+	// Target and module path `mybinary::mymodule::submodule`
+    module(),
+	// Concatenated span name where the event occured `parentspan::childspan`
+    span(),
+
+    time(TimeFormat::PrettyTime),
+	// Change the casing of all the key names `camelCase` to `snake_case`
+    case: Case,
+    pretty: bool,
+    concat: Option<String>,
+    level: LevelFormat,
+	// Put anything that implements write here to redirect output
+	.writer(std::io::stderr());
+```
+
 
 Log levels are converted to numbers by default:
 ```text

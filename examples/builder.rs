@@ -1,15 +1,23 @@
+use traceon::LevelFormat::Uppercase;
 use tracing::Level;
 
 mod math {
-    pub fn add() {
+    #[tracing::instrument]
+    pub fn add(a: u32) {
         tracing::info!("inside a module");
     }
 }
 
 fn main() {
-    traceon::pretty().on();
+    // traceon::builder()
+    //     .level(Uppercase)
+    //     .pretty()
+    //     .timestamp()
+    //     .concat(Some("::"))
+    //     .on();
+    // traceon::builder().time(TimeFormat::);
+    tracing::info!("a simple message");
 
-    tracing::info!("single message nothing here");
     let five = 5;
     let _span = tracing::info_span!("cool", five).entered();
     tracing::info!("only this message and level as text");
@@ -19,12 +27,12 @@ fn main() {
         event_example = "add field and log it without a span"
     );
 
-    let vector = vec!["cool", "one", "cuz"];
+    let vector = vec!["one", "two", "three"];
     tracing::event!(
         Level::WARN,
         message = "add message field, and debug a vector",
         vector = format!("{:#?}", vector),
     );
 
-    math::add();
+    math::add(15);
 }

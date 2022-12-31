@@ -1,7 +1,8 @@
 #![doc = include_str!("../README.md")]
 mod traceon;
-pub use crate::traceon::{Case, LevelFormat, Traceon};
+pub use crate::traceon::{Case, LevelFormat, TimeFormat, TimeZone, Traceon};
 
+pub use chrono::SecondsFormat;
 pub use tracing;
 use tracing::subscriber::DefaultGuard;
 use tracing_subscriber::layer::SubscriberExt;
@@ -26,14 +27,16 @@ use tracing_subscriber::{EnvFilter, Registry};
 ///     // Send output to anything that implements `std::io::Write`
 ///     .writer(std::io::stderr());
 /// ```
-#[must_use]
-pub fn json() -> Traceon {
-    Traceon::default()
+pub fn json() {
+    Traceon::json_default().on()
 }
 
-#[must_use]
-pub fn pretty() -> Traceon {
-    Traceon::pretty()
+pub fn pretty() {
+    Traceon::pretty_default().on()
+}
+
+pub fn builder() -> Traceon {
+    Traceon::default()
 }
 
 /// Use the defaults and set the global default subscriber

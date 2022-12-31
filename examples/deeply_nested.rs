@@ -17,10 +17,7 @@ async fn level_3(param: &str, param_2: &str, param_3: &str) {
 
 #[tokio::main]
 async fn main() {
-    traceon::json()
-        .with_module_path(true)
-        .with_concat(Some("::"))
-        .on();
+    traceon::builder().module().concat(Some("::")).on();
     let span = info_span!("base");
     level_1("base").instrument(span).await;
 }

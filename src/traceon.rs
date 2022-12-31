@@ -1,5 +1,8 @@
 use nu_ansi_term::{Color, Style};
 // use erased_serde::{Serialize, Serializer};
+use chrono::offset::TimeZone as TimeZoneTrait;
+use chrono::SecondsFormat;
+use chrono::{DateTime, Local, Utc};
 use serde::ser::{SerializeMap, Serializer};
 use serde_json::Value;
 use std::{
@@ -7,7 +10,6 @@ use std::{
     io::Write,
     sync::{Arc, Mutex},
 };
-use time::format_description::well_known::Rfc3339;
 use tracing::{field::Visit, span::Attributes, Event, Id, Subscriber};
 use tracing_core::Field;
 use tracing_log::AsLog;
@@ -22,27 +24,54 @@ pub struct Traceon {
     file: bool,
     module: bool,
     span: bool,
-    timestamp: bool,
+    time: TimeFormat,
+    timezone: TimeZone,
     concat: Option<String>,
     level: LevelFormat,
     case: Case,
-    pretty: bool,
+    json: bool,
 }
 
 #[derive(Clone)]
 pub enum Case {
+    None,
     Camel,
     Pascal,
     Snake,
-    None,
 }
 
 #[derive(Copy, Clone)]
 pub enum LevelFormat {
-    Off,
+    None,
     Uppercase,
     Lowercase,
     Number,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum TimeFormat {
+    None,
+    EpochSeconds,
+    EpochMilliseconds,
+    EpochMicroseconds,
+    EpochNanoseconds,
+    /// Well known format e.g.
+    RFC2822,
+    /// Well known format similar to ISO 8601 e.g. 2022-12-31T00:15:08.241974+00:00
+    RFC3339,
+    /// Seconds format and bool to replace +00:00 timezone with Z e.g. (SecondsFormat::Secs, true) = 2022-12-31T00:15:08Z
+    RFC3339Options(SecondsFormat, bool),
+    /// Pretty Print the time in format HH:mm:SS
+    PrettyTime,
+    /// Pretty Print the date in format YYYY:MM::DD HH:mm:SS
+    PrettyDateTime,
+    CustomFormat(String),
+}
+
+#[derive(Clone)]
+pub enum TimeZone {
+    UTC,
+    Local,
 }
 
 /// Convert json values with \n and \" characters to their escaped values when in pretty mode
@@ -54,41 +83,78 @@ pub fn clean_json_value(value: &Value) -> String {
         .replace("\\n", "\n    ")
 }
 
+pub fn time_convert<Tz: TimeZoneTrait>(now: DateTime<Tz>, time: &TimeFormat) -> String
+where
+    Tz::Offset: std::fmt::Display,
+{
+    match time {
+        TimeFormat::None => now.timestamp().to_string(),
+        TimeFormat::EpochSeconds => now.timestamp().to_string(),
+        TimeFormat::EpochMilliseconds => now.timestamp_millis().to_string(),
+        TimeFormat::EpochMicroseconds => now.timestamp_micros().to_string(),
+        TimeFormat::EpochNanoseconds => now.timestamp_subsec_nanos().to_string(),
+        TimeFormat::RFC2822 => now.to_rfc2822(),
+        TimeFormat::RFC3339 => now.to_rfc3339(),
+        TimeFormat::RFC3339Options(seconds_format, use_z) => {
+            now.to_rfc3339_opts(*seconds_format, *use_z)
+        }
+        TimeFormat::PrettyTime => now.format("%T").to_string(),
+        TimeFormat::PrettyDateTime => now.format("%Y-%m-%d %T").to_string(),
+        TimeFormat::CustomFormat(fmt) => now.format(fmt).to_string(),
+    }
+}
+
 impl Default for Traceon {
     #[must_use]
     fn default() -> Traceon {
         Traceon {
             writer: Arc::new(Mutex::new(std::io::stdout())),
             concat: Some("::".into()),
-            file: true,
-            span: true,
-            timestamp: true,
-            module: true,
-            pretty: false,
+            file: false,
+            span: false,
+            time: TimeFormat::RFC3339Options(SecondsFormat::Millis, true),
+            timezone: TimeZone::UTC,
+            module: false,
+            json: false,
             case: Case::None,
-            level: crate::LevelFormat::Number,
+            level: crate::LevelFormat::Uppercase,
         }
     }
 }
 
 impl Traceon {
     #[must_use]
-    pub fn pretty() -> Self {
+    pub fn pretty_default() -> Self {
         Traceon {
             writer: Arc::new(Mutex::new(std::io::stdout())),
             concat: Some("::".into()),
             file: true,
             span: true,
-            timestamp: true,
+            time: TimeFormat::PrettyTime,
+            timezone: TimeZone::Local,
             module: true,
-            pretty: true,
+            json: true,
+            case: Case::None,
+            level: crate::LevelFormat::Uppercase,
+        }
+    }
+    pub fn json_default() -> Self {
+        Traceon {
+            writer: Arc::new(Mutex::new(std::io::stdout())),
+            concat: Some("::".into()),
+            file: true,
+            span: true,
+            time: TimeFormat::RFC3339,
+            timezone: TimeZone::UTC,
+            module: true,
+            json: false,
             case: Case::None,
             level: crate::LevelFormat::Uppercase,
         }
     }
     /// Turn the file field on or off
     /// ```
-    /// traceon::builder().default_fields(false).file(true).on();
+    /// traceon::json().file(true).on();
     /// tracing::info!("file field on");
     /// ```
     ///
@@ -99,53 +165,19 @@ impl Traceon {
     /// }
     /// ```
     #[must_use]
-    pub fn file(&mut self, on: bool) -> &mut Self {
-        self.file = on;
+    pub fn file(&mut self) -> &mut Self {
+        self.file = true;
         self
     }
 
-    /// Turn the default fields on or off
-    /// ```
-    /// traceon::builder().default_fields(true).on();
-    /// tracing::info!("default fields on");
-    /// ```
-    ///
-    /// output:
-    ///
-    /// ```json
-    /// {
-    ///   "level": 30,
-    ///   "timestamp": "2022-12-29T04:14:15.672619Z",
-    ///   "module": "traceon",
-    ///   "file": "src/traceon.rs:85",
-    ///   "message": "default fields on"
-    /// }
-    /// ```
-    #[must_use]
-    pub fn default_fields(&mut self, on: bool) -> &mut Self {
-        if on {
-            self.file = true;
-            self.module = true;
-            self.span = true;
-            self.timestamp = true;
-            self.level = LevelFormat::Number
-        } else {
-            self.file = false;
-            self.module = false;
-            self.span = false;
-            self.timestamp = false;
-            self.level = LevelFormat::Off
-        }
-        self
-    }
     /// Turn span fields on or off
     /// ```
-    /// traceon::builder().default_fields(false).span(true).on();
+    /// traceon::json().span(true).on();
     /// let _span = tracing::info_span!("level_1").entered();
-    /// tracing::info!("span field is on");
+    /// tracing::info!("span level 1");
     ///
     /// let _span = tracing::info_span!("level_2").entered();
-    /// tracing::info!("span field is on");
+    /// tracing::info!("span level 2");
     /// ```
     ///
     /// output:
@@ -163,10 +195,10 @@ impl Traceon {
     ///    }
     /// ```
     ///
-    /// To turn of concatenation of span fields:
+    /// To turn off concatenation of span fields:
     ///
     /// ```
-    /// traceon::builder().default_fields(false).span(true).concat(None).on();
+    /// traceon::json().concat(None).on();
     /// let _span = tracing::info_span!("level_1").entered();
     /// tracing::info!("span field is on");
     ///
@@ -190,19 +222,19 @@ impl Traceon {
     /// ```
     ///
     #[must_use]
-    pub fn span(&mut self, on: bool) -> &mut Self {
-        self.span = on;
+    pub fn span(&mut self) -> &mut Self {
+        self.span = true;
         self
     }
 
     /// Turn module on or off
     /// ```
-    /// traceon::builder().default_fields(false).module(true).on();
-    /// let traceon =
+    /// traceon::builder().module().writer(std::io::stderr()).on();
+    /// tracing::info!("short message");
     /// ```
     #[must_use]
-    pub fn module(&mut self, on: bool) -> &mut Self {
-        self.module = on;
+    pub fn module(&mut self) -> &mut Self {
+        self.module = true;
         self
     }
     #[must_use]
@@ -215,13 +247,23 @@ impl Traceon {
         self
     }
     #[must_use]
-    pub fn timestamp(&mut self, on: bool) -> &mut Self {
-        self.timestamp = on;
+    pub fn time(&mut self, time_format: TimeFormat) -> &mut Self {
+        self.time = time_format;
         self
     }
     #[must_use]
     pub fn level(&mut self, level_format: LevelFormat) -> &mut Self {
         self.level = level_format;
+        self
+    }
+    #[must_use]
+    pub fn timezone(&mut self, timezone: TimeZone) -> &mut Self {
+        self.timezone = timezone;
+        self
+    }
+    #[must_use]
+    pub fn json(&mut self) -> &mut Self {
+        self.json = true;
         self
     }
     #[must_use]
@@ -268,7 +310,7 @@ impl Traceon {
         value: &str,
         buffer: &mut Vec<u8>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        if self.pretty && key != "message" {
+        if !self.json && key != "message" {
             writeln!(buffer, "{}: {}", key, value)?;
         };
         Ok(())
@@ -296,36 +338,42 @@ impl Traceon {
 
         let metadata = event.metadata();
 
-        use time::macros::format_description;
-        if self.timestamp {
-            if self.pretty {
-                let pretty_time = format_description!("[hour]:[minute]:[second]");
-                if let Ok(time) = &time::OffsetDateTime::now_utc().format(&pretty_time) {
-                    write!(msg, "{time} ")?;
+        if self.time != TimeFormat::None {
+            let time_string = match self.timezone {
+                TimeZone::UTC => {
+                    let now = Utc::now();
+                    time_convert(now, &self.time)
                 }
-            } else if let Ok(time) = &time::OffsetDateTime::now_utc().format(&Rfc3339) {
-                map_serializer.serialize_entry(timestamp_key, time)?;
+                TimeZone::Local => {
+                    let now = Local::now();
+                    time_convert(now, &self.time)
+                }
+            };
+            if self.json {
+                map_serializer.serialize_entry(timestamp_key, &time_string)?;
+            } else {
+                write!(msg, "{time_string} ")?;
             }
         }
         match self.level {
             LevelFormat::Uppercase => {
-                if self.pretty {
-                    write!(msg, "{} ", metadata.level())?;
-                } else {
+                if self.json {
                     map_serializer.serialize_entry(level_key, &metadata.level().to_string())?;
+                } else {
+                    write!(msg, "{} ", metadata.level())?;
                 }
             }
             LevelFormat::Lowercase => {
-                if self.pretty {
+                if self.json {
+                    map_serializer.serialize_entry(
+                        level_key,
+                        &metadata.level().to_string().to_ascii_lowercase(),
+                    )?;
+                } else {
                     write!(
                         msg,
                         "{} ",
                         metadata.level().to_string().to_ascii_lowercase()
-                    )?;
-                } else {
-                    map_serializer.serialize_entry(
-                        level_key,
-                        &metadata.level().to_string().to_ascii_lowercase(),
                     )?;
                 }
             }
@@ -338,17 +386,17 @@ impl Traceon {
                     log::Level::Trace => 10,
                 };
 
-                if self.pretty {
-                    write!(msg, "{} ", number)?;
-                } else {
+                if self.json {
                     map_serializer.serialize_entry(level_key, &number)?;
+                } else {
+                    write!(msg, "{} ", number)?;
                 }
             }
-            LevelFormat::Off => (),
+            LevelFormat::None => (),
         }
         // let x = d.format(&format).expect("Failed to format the time");
 
-        if self.pretty {
+        if !self.json {
             let style = match event.metadata().level().as_log() {
                 log::Level::Trace => Style::new().fg(Color::Purple),
                 log::Level::Debug => Style::new().fg(Color::Blue),
@@ -371,14 +419,14 @@ impl Traceon {
         let mut fields = Vec::new();
 
         if self.module {
-            if self.pretty {
+            if self.json {
+                map_serializer
+                    .serialize_entry(module_key, metadata.module_path().unwrap_or_default())?;
+            } else {
                 fields.push((
                     module_key.to_string(),
                     metadata.module_path().unwrap_or_default().to_string(),
                 ));
-            } else {
-                map_serializer
-                    .serialize_entry(module_key, metadata.module_path().unwrap_or_default())?;
             }
         }
 
@@ -389,10 +437,10 @@ impl Traceon {
                 metadata.line().unwrap_or_default()
             );
 
-            if self.pretty {
-                fields.push((file_key.to_string(), value.to_string()));
-            } else {
+            if self.json {
                 map_serializer.serialize_entry(file_key, &value)?;
+            } else {
+                fields.push((file_key.to_string(), value.to_string()));
             }
         }
 
@@ -405,12 +453,10 @@ impl Traceon {
                 Case::None => key.to_string(),
             };
 
-            if self.pretty {
-                if key != "message" {
-                    fields.push((key.to_string(), clean_json_value(value)));
-                }
-            } else {
+            if self.json {
                 map_serializer.serialize_entry(&key, value)?;
+            } else if key != "message" {
+                fields.push((key.to_string(), clean_json_value(value)));
             }
         }
 
@@ -426,17 +472,15 @@ impl Traceon {
                         Case::None => key.to_string(),
                     };
 
-                    if self.pretty {
-                        if key != "message" {
-                            fields.push((key.to_string(), clean_json_value(value)));
-                        }
-                    } else {
+                    if self.json {
                         map_serializer.serialize_entry(&key, value)?;
+                    } else if key != "message" {
+                        fields.push((key.to_string(), clean_json_value(value)));
                     }
                 }
             }
         }
-        if self.pretty {
+        if !self.json {
             fields.sort_by(|a, b| a.0.cmp(&b.0));
             let mut max_len = 0;
             for field in &fields {
@@ -454,10 +498,10 @@ impl Traceon {
             }
         }
         map_serializer.end()?;
-        if self.pretty {
-            Ok(pretty_buffer)
-        } else {
+        if self.json {
             Ok(json_buffer)
+        } else {
+            Ok(pretty_buffer)
         }
     }
 }
@@ -493,24 +537,22 @@ where
                 .get_mut::<JsonStorage>()
                 .map(|v| v.to_owned())
                 .unwrap_or_default();
-            if self.span {
-                if let Some(orig) = storage
-                    .values
-                    .insert(span_key, serde_json::Value::from(span.metadata().name()))
-                {
-                    if let Some(concat) = &self.concat {
-                        storage.values.insert(
-                            span_key,
-                            serde_json::Value::from(format!(
-                                "{}{}{}",
-                                orig.as_str().unwrap_or(""),
-                                concat,
-                                span.metadata().name()
-                            )),
-                        );
-                    }
-                };
-            }
+            if let Some(orig) = storage
+                .values
+                .insert(span_key, serde_json::Value::from(span.metadata().name()))
+            {
+                if let Some(concat) = &self.concat {
+                    storage.values.insert(
+                        span_key,
+                        serde_json::Value::from(format!(
+                            "{}{}{}",
+                            orig.as_str().unwrap_or(""),
+                            concat,
+                            span.metadata().name()
+                        )),
+                    );
+                }
+            };
             storage
         } else {
             let mut storage = JsonStorage::new(self.concat.clone());
