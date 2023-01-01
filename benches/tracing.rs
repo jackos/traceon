@@ -6,9 +6,9 @@ fn bench_traceon(c: &mut Criterion) {
     let mut group = c.benchmark_group("traceon");
 
     group.bench_function("traceon", |b| {
-        let _guard = traceon::builder()
-            .file(false)
-            .writer(std::io::sink())
+        let _guard = traceon::json()
+            .with_filepath(false)
+            .with_writer(std::io::sink())
             .on_thread();
         b.iter(|| {
             black_box(tracing::info!("testing out a resonably long string"));

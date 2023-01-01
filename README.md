@@ -13,7 +13,7 @@ traceon = "0.1"
 And you can write your first trace with:
 ```rust
 fn main() {
-    traceon::on();
+    traceon::json();
     tracing::info!("a simple message");
 }
 ```
@@ -26,6 +26,37 @@ Which will give the default output of (this is configurable):
   "file": "src/main.rs:14"
 }
 ```
+Or you can use the pretty defaults:
+```rust
+traceon::pretty();
+```
+```
+22:22:03 INFO a simple message
+    file:   examples/builder.rs:19
+    module: builder
+```
+Or you can use the builder to create your own format:
+
+```rust
+use traceon::{TimeFormat, TimeZone, LevelFormat}
+traceon::builder()
+	// Source code filename and line number `src/main.rs::10`
+    file(),
+	// Target and module path `mybinary::mymodule::submodule`
+    module(),
+	// Concatenated span name where the event occured `parentspan::childspan`
+    span(),
+
+    time(TimeFormat::PrettyTime),
+	// Change the casing of all the key names `camelCase` to `snake_case`
+    case: Case,
+    pretty: bool,
+    concat: Option<String>,
+    level: LevelFormat,
+	// Put anything that implements write here to redirect output
+	.writer(std::io::stderr());
+```
+
 
 Log levels are converted to numbers by default:
 ```text
@@ -148,7 +179,7 @@ async fn main() {
 You can see above that the child span name `add` was concatenated to the parent span name `math_functions` with the characters `::`, if you prefer the span just overrides the parent you can turn this functionality off:
 ```rust
 fn main() {
-	traceon::builder().concat("").on();
+	traceon::builder().concat(None).on();
 }
 ```
 ```json
@@ -160,7 +191,7 @@ fn main() {
 or set it to something different:
 ```rust
 fn main() {
-	traceon::builder().concat(">").on();
+	traceon::builder().concat(Some(">")).on();
 }
 ```
 
@@ -265,76 +296,71 @@ fn main() {
 ```
 
 ### Change the case of keys
-Often you'll be consuming different crates that implement their own traces and you need all their keys to match a certain format, this example also demonstrates how to use different instances of `traceon` for a given scope with `on_thread()`, which returns a guard that will be dropped at the end of the scope, all current span fields and formatting will be dropped with it:
+Often you'll be consuming different crates that implement their own traces and you need all their keys to match a certain format, this example also demonstrates how to use different instances of `traceon` for a given scope with `on_thread()`, which returns a guard so the subscriber is only running on the current thread, and will be turned off when the guard is dropped 
 [examples/casing.rs](examples/casing.rs)
 ```rust
 use traceon::Case;
 use tracing::Level;
 fn main() {
-    {
-        let _guard = traceon::builder().key_case(Case::Pascal).on_thread();
-        tracing::event!(
-            Level::INFO,
-            PascalCase = "test",
-            camelCase = "test",
-            snake_case = "test",
-            SCREAMING_SNAKE_CASE = "test",
-        );
-    }
-    {
-        let _guard = traceon::builder().key_case(Case::Camel).on_thread();
-        tracing::event!(
-            Level::INFO,
-            PascalCase = "test",
-            camelCase = "test",
-            snake_case = "test",
-            SCREAMING_SNAKE_CASE = "test",
-        );
-    }
-    {
-        let _guard = traceon::builder().key_case(Case::Snake).on_thread();
+    let _guard = traceon::builder().case(Case::Pascal).on_thread();
+    tracing::event!(
+        Level::INFO,
+        message = "PascalCase",
+        PascalCase = "test",
+        camelCase = "test",
+        snake_case = "test",
+        SCREAMING_SNAKE_CASE = "test",
+    );
+    let _guard = traceon::builder().case(Case::Camel).on_thread();
+    tracing::event!(
+        Level::INFO,
+        message = "camelCase",
+        PascalCase = "test",
+        camelCase = "test",
+        snake_case = "test",
+        SCREAMING_SNAKE_CASE = "test",
+    );
+    let _guard = traceon::builder().case(Case::Snake).on_thread();
 
-        tracing::event!(
-            Level::INFO,
-            PascalCase = "test",
-            camelCase = "test",
-            snake_case = "test",
-            SCREAMING_SNAKE_CASE = "test",
-        );
-    }
+    tracing::event!(
+        Level::INFO,
+        message = "snake_case",
+        PascalCase = "test",
+        camelCase = "test",
+        snake_case = "test",
+        SCREAMING_SNAKE_CASE = "test",
+    );
 }
-
 ```
+### Pretty output
+![images/casing.svg](images/casing.svg)
+
+### Json output
 ```json
 {
-  "Level": 30,
-  "Timestamp": "2022-12-29T03:51:55.640613Z",
-  "Module": "casing",
-  "File": "examples/casing.rs:6",
-  "SnakeCase": "test",
-  "PascalCase": "test",
+  "Timestamp": "2023-01-01T01:10:58.337Z",
+  "Level": "INFO",
+  "Message": "PascalCase",
   "CamelCase": "test",
-  "ScreamingSnakeCase": "test"
+  "SnakeCase": "test"
 }
 {
-  "level": 30,
-  "timestamp": "2022-12-29T03:51:55.641014Z",
-  "module": "casing",
-  "file": "examples/casing.rs:16",
-  "screamingSnakeCase": "test",
-  "pascalCase": "test",
+  "timestamp": "2023-01-01T01:10:58.338Z",
+  "level": "INFO",
+  "message": "camelCase",
   "camelCase": "test",
-  "snakeCase": "test"
+  "snakeCase": "test",
+  "pascalCase": "test",
+  "screamingSnakeCase": "test"
 }
 {
-  "level": 30,
-  "timestamp": "2022-12-29T03:51:55.641204Z",
-  "module": "casing",
-  "file": "examples/casing.rs:27",
-  "screaming_snake_case": "test",
+  "timestamp": "2023-01-01T01:10:58.338Z",
+  "level": "INFO",
   "camel_case": "test",
+  "screaming_snake_case": "test",
+  "pascal_case": "test",
   "snake_case": "test",
-  "pascal_case": "test"
+  "message": "snake_case"
 }
 ```
 

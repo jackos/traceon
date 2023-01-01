@@ -1,14 +1,40 @@
 #![doc = include_str!("../README.md")]
 mod traceon;
-pub use crate::traceon::{Case, LevelFormat, Traceon};
+pub use crate::traceon::{Case, LevelFormat, TimeFormat, TimeZone, Traceon};
 
+pub use chrono::SecondsFormat;
 pub use tracing;
 use tracing::subscriber::DefaultGuard;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{EnvFilter, Registry};
 
-/// Use the defaults and set the global default subscriber
-#[must_use]
+/// Returns a builder that can be configured before being turned on, or used as a layer for a subscriber.
+/// All the options are shown in the example below.
+/// ```
+/// use traceon::{LevelFormat, Case};
+/// traceon::builder()
+///     // Turn off the default fields
+///     .file(false)
+///     .span(false)
+///     .module(false)
+///     .timestamp(false)
+///     // Set the log level to text instead of numbers
+///     .level(LevelFormat::Lowercase)
+///     // Rename the json keys to match a case
+///     .case(Case::Snake)
+///     // Concatentate fields that are repeated in nested spans, or turn off with ""
+///     .concat(Some("::"))
+///     // Send output to anything that implements `std::io::Write`
+///     .writer(std::io::stderr());
+/// ```
+pub fn json() {
+    Traceon::json_default().on()
+}
+
+pub fn pretty() {
+    Traceon::pretty_default().on()
+}
+
 pub fn builder() -> Traceon {
     Traceon::default()
 }

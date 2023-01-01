@@ -1,6 +1,6 @@
 [package]
 name = "traceon"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Jack Clayton <jackos@me.com>"]
 edition = "2021"
 license = "MIT/Apache-2.0"
@@ -17,7 +17,12 @@ tracing-core = "0.1"
 tracing-log = "0.1"
 serde = "1"
 serde_json = "1"
-time = { version = "0.3", default-features = false, features = ["formatting"] }
+time = { version = "0.3", default-features = false, features = [
+	"formatting",
+	"macros",
+] }
+nu-ansi-term = "0.46.0"
+chrono = "0.4.23"
 
 [dependencies.tracing-subscriber]
 version = "0.3"
@@ -38,7 +43,7 @@ tracing-appender = "0.2.2"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
-default-features = false
+# default-features = false
 features = ["registry", "fmt", "env-filter", "json"]
 
 [dev-dependencies.tracing]

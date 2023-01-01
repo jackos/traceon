@@ -1,9 +1,13 @@
 # Changelog
-## [0.1.7] - 2022-12-28
+## [0.2.0] - 2022-01-01
+- Add pretty printing and time formatting
+- Different public API, `json()`, `pretty()` and `builder()` options 
+
+## [0.1.7] - 2022-12-29
 - Fix casing functionality and docs
 - Fix tracing link
 
-## [0.1.6] - 2022-12-28
+## [0.1.6] - 2022-12-29
 - Improve documentation and examples
 - Fix casing on SCREAMING_CASE 
 

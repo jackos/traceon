@@ -24,10 +24,10 @@ async fn level_3(param: &str, param_2: &str, param_3: &str) {
 
 // Here we have an async function to benchmark
 async fn traceon() {
-    let _guard = traceon::builder()
-        .file(false)
-        .writer(std::io::sink())
-        .concat("::")
+    let _guard = traceon::json()
+        .with_filepath(false)
+        .with_writer(std::io::sink())
+        .with_concat("::")
         .on_thread();
 
     let span = info_span!("base");
