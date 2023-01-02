@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 360" style="background-color:#1f2335" fill="none">
-    <text font-family="monospace" x="20" y="20" fill="#72d8c8">2022-12-31T04:12:06.304Z INFO PascalCase</text>
+    <text font-family="monospace" x="20" y="20" fill="#72d8c8">04:12:06 INFO PascalCase</text>
     <text font-family="monospace" x="20" y="40" fill="#858db1">&#160;&#160;&#160;&#160;CamelCase:&#160;&#160;test</text>
     <text font-family="monospace" x="20" y="60" fill="#858db1">&#160;&#160;&#160;&#160;PascalCase:&#160;test</text>
     <text font-family="monospace" x="20" y="80" fill="#858db1">&#160;&#160;&#160;&#160;ScreamCase: test</text>
     <text font-family="monospace" x="20" y="100" fill="#858db1">&#160;&#160;&#160;&#160;SnakeCase:&#160;&#160;test</text>
-    <text font-family="monospace" x="20" y="140" fill="#72d8c8">2022-12-31T04:12:06.304Z INFO camelCase</text>
+    <text font-family="monospace" x="20" y="140" fill="#72d8c8">04:12:06 INFO camelCase</text>
     <text font-family="monospace" x="20" y="160" fill="#858db1">&#160;&#160;&#160;&#160;camelCase:&#160;&#160;test</text>
     <text font-family="monospace" x="20" y="180" fill="#858db1">&#160;&#160;&#160;&#160;pascalCase:&#160;test</text>
     <text font-family="monospace" x="20" y="200" fill="#858db1">&#160;&#160;&#160;&#160;screamCase: test</text>
     <text font-family="monospace" x="20" y="220" fill="#858db1">&#160;&#160;&#160;&#160;snakeCase:&#160;&#160;test</text>
-    <text font-family="monospace" x="20" y="260" fill="#72d8c8">2022-12-31T04:12:06.304Z INFO snake_case</text>
+    <text font-family="monospace" x="20" y="260" fill="#72d8c8">04:12:06 INFO snake_case</text>
     <text font-family="monospace" x="20" y="280" fill="#858db1">&#160;&#160;&#160;&#160;camel_case:&#160;&#160;test</text>
     <text font-family="monospace" x="20" y="300" fill="#858db1">&#160;&#160;&#160;&#160;pascal_case:&#160;test</text>
     <text font-family="monospace" x="20" y="320" fill="#858db1">&#160;&#160;&#160;&#160;scream_case: test</text>

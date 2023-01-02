@@ -1,9 +1,8 @@
-use traceon::Traceon;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 fn main() {
     tracing_subscriber::registry()
-        .with(Traceon::default())
+        .with(traceon::builder())
         .with(EnvFilter::new("error"))
         .init();
 

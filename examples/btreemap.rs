@@ -2,6 +2,7 @@
 //! how you could build your own storage and formatting layer from scratch
 //! using a BTreeMap instead of the HashMap that traceon uses. Have it here for
 //! future reference as the BTreeMap apears to have slightly better performance
+//! but HashMap appears to perform better on more deeply nested spans.
 //!
 //! It's from the guide is provided here:
 //! https://burgers.io/custom-logging-in-rust-using-tracing-part-2

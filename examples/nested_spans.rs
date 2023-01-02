@@ -1,15 +1,13 @@
-use tracing::Instrument;
+use traceon::SpanFormat;
 
-async fn add(a: i32, b: i32) {
-    // Important! Don't put any `.await` calls in between `entered()` and `exit()`
-    let span = tracing::info_span!("add", a, b).entered();
+#[tracing::instrument]
+fn add(a: i32, b: i32) {
     tracing::info!("result: {}", a + b);
-    span.exit();
 }
 
-#[tokio::main]
-async fn main() {
-    traceon::on();
-    let span = tracing::info_span!("math_functions", package_name = env!("CARGO_PKG_NAME"));
-    add(5, 10).instrument(span).await;
+fn main() {
+    // traceon::builder().on();
+    traceon::builder().span(SpanFormat::Overwrite).on();
+    let _guard = tracing::info_span!("math", package_name = env!("CARGO_PKG_NAME")).entered();
+    add(5, 10);
 }

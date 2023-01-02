@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 100" style="background-color:#1f2335" fill="none">
+    <text font-family="monospace" x="20" y="20" fill="#72d8c8">04:26:07 INFO result: 15</text>
+    <text font-family="monospace" x="20" y="40" fill="#858db1">&#160;&#160;&#160;&#160;a:&#160;&#160;&#160;&#160;5</text>
+    <text font-family="monospace" x="20" y="60" fill="#858db1">&#160;&#160;&#160;&#160;b:&#160;&#160;&#160;&#160;10</text>
+    <text font-family="monospace" x="20" y="80" fill="#858db1">&#160;&#160;&#160;&#160;span: add</text>
+</svg>

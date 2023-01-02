@@ -1,7 +1,9 @@
 # Changelog
 ## [0.2.0] - 2022-01-01
+- Settle on public API, fix docs
+
+## [0.1.8] - 2022-01-01
 - Add pretty printing and time formatting
-- Different public API, `json()`, `pretty()` and `builder()` options 
 
 ## [0.1.7] - 2022-12-29
 - Fix casing functionality and docs

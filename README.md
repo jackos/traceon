@@ -1,70 +1,102 @@
-# Traceon - trace on json
-An easy to use log and tracing formatter with a flattened json output, it only takes one line of code for good defaults, with an easy to use builder for configuration.
+# Traceon
+_Pronounced `trace on`_
 
-The main purpose of this crate is to simplify the concept of `tracing`, which is just adding context to log messages for better debugging and observability, this documentation will cover everything you need, [but the detailed tracing docs are here](https://docs.rs/tracing/latest/tracing/).
+An easy to use log and tracing formatter with a flattened json or pretty output.
 
-The only two crates you'll need in your `Cargo.toml` are:
+It simplifies `tracing`, which adds context to log messages for better observability especially in async or multithreaded contexts, this documentation will get you up and running [but the detailed tracing docs are here](https://docs.rs/tracing/latest/tracing/).
+
+The only two crates you need in `Cargo.toml` are:
 
 ```toml
 [dependencies]
 tracing = "0.1"
-traceon = "0.1"
+traceon = "0.2"
 ```
-And you can write your first trace with:
+
+You can write your first human readable trace with:
 ```rust
-fn main() {
-    traceon::json();
-    tracing::info!("a simple message");
+use tracing::{info, instrument};
+
+#[instrument]
+fn add(a: i32, b: i32) {
+    info!("result: {}", a + b);
 }
+
+fn main() {
+    traceon::builder().on();
+    add(5, 10);
+}
+
 ```
-Which will give the default output of (this is configurable):
+Which will give the default output:
+![images/pretty.svg](images/pretty.svg)
+
+To turn the output into json:
+```rust
+traceon::builder().json().on();
+```
 ```json
 {
-  "message": "a simple message",
-  "level": 30,
-  "time": "2022-12-27T10:16:24.570889Z",
-  "file": "src/main.rs:14"
+  "time": "2023-01-01T05:28:13.447Z",
+  "level": "INFO",
+  "message": "result: 15",
+  "a": 5,
+  "b": 10,
+  "span": "add"
 }
 ```
-Or you can use the pretty defaults:
+This example shows all the options you can change with the builder:
 ```rust
-traceon::pretty();
-```
-```
-22:22:03 INFO a simple message
-    file:   examples/builder.rs:19
-    module: builder
-```
-Or you can use the builder to create your own format:
+use traceon::{Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, TimeZone};
+fn main() {
+    traceon::builder()
+        // Add field with source code filename and line number e.g. src/main.rs:10
+        .file()
+        // Add field with target and module path e.g. mybinary::mymodule::submodule
+        .module()
+        // Turn off field with joined span name where the event occured e.g. parentspan::childspan
+        .span(SpanFormat::None)
+        // If the time is recorded in local system timezone or UTC
+        .timezone(TimeZone::UTC)
+        // Change the formatting of the time to RFC3339 with Seconds and Zulu
+        .time(TimeFormat::RFC3339Options(SecondsFormat::Secs, true))
+        // Change the casing of all the key names e.g. `camelCase` to `snake_case`
+        .case(Case::Snake)
+        // The characters used to concatenate field values that repeat in nested spans. Defaults to ::
+        .join_fields(JoinFields::All("::"))
+        // Turn on json formatting instead of pretty output
+        .json()
+        // Change level value formatting to numbers for easier filtering
+        // trace: 10
+        // debug: 20
+        // info:  30
+        // warn:  40
+        // error: 50
+        .level(LevelFormat::Number)
+        // Put anything that implements Write here to redirect output
+        .writer(std::io::stderr())
+        // This will activate it globally on all threads!
+        .on();
 
+    tracing::info!("a simple message");
+}
+
+```
+Output
+```json
+{
+	"timestamp": "2023-01-01T03:26:48Z",
+	"level": 30,
+	"module": "builder",
+	"file": "examples/builder.rs:27",
+	"message": "a simple message"
+}
+```
+The defaults of the builder are optimized for local development, that is pretty output with just the local time, when moving to production e.g. on a cloud provider, you're likely going to want to turn the time off as they often record `stdout` and capture their own timestamps:
 ```rust
-use traceon::{TimeFormat, TimeZone, LevelFormat}
-traceon::builder()
-	// Source code filename and line number `src/main.rs::10`
-    file(),
-	// Target and module path `mybinary::mymodule::submodule`
-    module(),
-	// Concatenated span name where the event occured `parentspan::childspan`
-    span(),
+use traceon::TimeFormat;
 
-    time(TimeFormat::PrettyTime),
-	// Change the casing of all the key names `camelCase` to `snake_case`
-    case: Case,
-    pretty: bool,
-    concat: Option<String>,
-    level: LevelFormat,
-	// Put anything that implements write here to redirect output
-	.writer(std::io::stderr());
-```
-
-
-Log levels are converted to numbers by default:
-```text
-trace: 10
-debug: 20
-info:  30
-warn:  40
-error: 50
+traceon::builder().time(TimeFormat::None).json();
 ```
 
 `env-filter` is used by default at the `info` level to filter any messages out at the `debug` or `trace` level, to change the level you can set an environment variable e.g. `RUST_LOG=warn` which would filter out `info` level as well, all the options are [detailed here](https://docs.rs/env_logger/latest/env_logger/)
@@ -83,24 +115,17 @@ async fn add(a: i32, b: i32) {
 
 #[tokio::main]
 async fn main() {
-    traceon::on();
+    traceon::builder().on();
     add(5, 10).await;
 }
 ```
 
-```json
-{
-  "message": "result: 15",
-  "level": 30,
-  "timestamp": "2022-12-29T02:53:42.6727Z",
-  "module": "instrument",
-  "file": "examples/instrument.rs:3",
-  "span": "add",
-  "a": 5,
-  "b": 10
-}
+```text
+06:16:30 INFO result: 15
+    a:    5
+    b:    10
+    span: add
 ```
-
 
 ### Instrument trait
 If you need to add additional context to an async function, you can create a span and instrument it:
@@ -115,25 +140,16 @@ async fn add(a: i32, b: i32) {
 
 #[tokio::main]
 async fn main() {
-    traceon::on();
-    let span = tracing::info_span!(
-		"math_functions", 
-		package_name = env!("CARGO_PKG_NAME",
-	));
+    traceon::builder().on();
+    let span = tracing::info_span!("math_functions", package_name = env!("CARGO_PKG_NAME",));
     add(5, 10).instrument(span).await;
 }
 ```
 
-```json
-{
-  "level": 30,
-  "timestamp": "2022-12-29T03:03:14.450507Z",
-  "module": "instrument_trait",
-  "file": "examples/instrument_trait.rs:4",
-  "message": "result: 15",
-  "span": "math_functions",
-  "package_name": "traceon"
-}
+```text
+06:18:55 INFO result: 15
+    package_name: traceon
+    span:         math_functions
 ```
 The above `package_name` comes from the environment variable provided by cargo, which gets it from `Cargo.toml` at compile time and saves it for runtime:
 ```toml
@@ -141,94 +157,102 @@ The above `package_name` comes from the environment variable provided by cargo, 
 name = "traceon"
 ```
 
-__IMPORTANT!__ if you're calling an async functions with `.await`, only use the above two methods to create a span, [more details here](https://docs.rs/tracing/latest/tracing/struct.Span.html#in-asynchronous-code) 
-
 [examples/nested_spans.rs](examples/nested_spans.rs)
+### Entered spans
+This creates a span and returns a guard, as long as that guard is in scope the span will be active:
+```rust
+fn add(a: i32, b: i32) {
+    tracing::info!("result: {}", a + b);
+}
+
+fn main() {
+    traceon::builder().on();
+    let _guard = tracing::info_span!("math", package_name = env!("CARGO_PKG_NAME")).entered();
+    add(5, 10);
+}
+```
+
+```text
+06:26:21 INFO result: 15
+    package_name: traceon
+    span:         math
+```
+
+> **Warning**
+> If `add()` was an `async fn`, holding onto the guard would cause memory leaks and information loss, you must use the above `instrument` macro or trait instead, [more details here](https://docs.rs/tracing/latest/tracing/struct.Span.html#in-asynchronous-code) 
+
+> **Note**
+> Just remember don't call `.await` while holding onto a guard
+
+
 ### Nested spans
-To combine the output from the two examples above we can enter a span with the arguments added to the trace:
+By default the span name will be joined with the characters `::` for nested spans:
 ```rust
-use tracing::Instrument;
-
-async fn add(a: i32, b: i32) {
-    // Important! Don't put any `.await` calls in between `entered()` and `exit()`
-    let span = tracing::info_span!("add", a, b).entered();
-    tracing::info!("result: {}", a + b);
-    span.exit();
-}
-
-#[tokio::main]
-async fn main() {
-    traceon::on();
-    let span = tracing::info_span!("math_functions", package_name = env!("CARGO_PKG_NAME"));
-    add(5, 10).instrument(span).await;
-}
-```
-
-```json
-{
-  "level": 30,
-  "time": "2022-12-28T12:19:43.386923Z",
-  "file": "examples/nested_spans.rs:6",
-  "message": "result: 15",
-  "span": "math_functions::add",
-  "a": 5,
-  "package_name": "traceon",
-  "b": 10
-}
-```
-You can see above that the child span name `add` was concatenated to the parent span name `math_functions` with the characters `::`, if you prefer the span just overrides the parent you can turn this functionality off:
-```rust
-fn main() {
-	traceon::builder().concat(None).on();
-}
-```
-```json
-{
-  "span": "add",
-}
-```
-
-or set it to something different:
-```rust
-fn main() {
-	traceon::builder().concat(Some(">")).on();
-}
-```
-
-```json
-{
-  "span": "math_functions>add"
-}
-```
-
-The `add` function from above could be rewritten like this:
-
-```rust
-async fn add(a: i32, b: i32) {
-    let _span = tracing::info_span!("add", a, b).entered();
+#[tracing::instrument]
+fn add(a: i32, b: i32) {
     tracing::info!("result: {}", a + b);
 }
-```
-This will cause the span to exit at the end of the function when _span is dropped, just remember to be very careful not to put any `.await` points when an `EnteredSpan` like `_span` above is being held.
 
-### Turn off fields
-This is an example of changing the default fields using the builder pattern, and takes the opportunity to introduce `tracing::event!`
+fn main() {
+    traceon::builder().on();
+    let _guard = tracing::info_span!("math", package_name = env!("CARGO_PKG_NAME")).entered();
+    add(5, 10);
+}
+```
+```text
+06:33:57 INFO result: 15
+    a:            5
+    b:            10
+    package_name: traceon
+    span:         math::add
+```
+
+You can set this to overwrite if you prefer:
+```rust
+use traceon::SpanFormat;
+traceon::builder().span(SpanFormat::Overwrite).on();
+```
+
+```text
+06:36:00 INFO result: 15
+    a:            5
+    b:            10
+    package_name: traceon
+    span:         add
+```
+
+By default all the other fields overwrite if a nested span has the same field name, you can join all fields or specific fields if you prefer (this only effects text values):
+
+```rust
+use traceon::JoinFields;
+traceon::builder()
+	.join_fields(JoinFields::Some("||", &["field_b"]))
+	.on();
+
+let _span_1 = tracing::info_span!("span_1", field_a = "original", field_b = "original").entered();
+let _span_2 = tracing::info_span!("span_2", field_a = "changed", field_b = "changed").entered();
+
+tracing::info!("testing field join");
+```
+
+output:
+```text
+12:44:12 INFO testing field join
+	field_a: changed
+	field_b: original||changed
+	span:    span_1::span_1
+```
+
+
+### Event
+`tracing::event!` allows you to add fields to message without having to create a span, just remember to put the level e.g. `tracing::Level::INFO` as the first parameter, this also shows how to create a custom message in an event, and how to output a `Debug` implementation:
 
 [examples/builder.rs](examples/builder.rs)
 ```rust
-use traceon::LevelFormat;
 use tracing::Level;
 
 fn main() {
-    traceon::builder()
-        .timestamp(false)
-        .module(false)
-        .span(false)
-        .file(false)
-        .level(LevelFormat::Lowercase)
-        .on();
-
-    tracing::info!("only this message and level as text");
+    traceon::builder().on();
 
     tracing::event!(
         Level::INFO,
@@ -238,25 +262,17 @@ fn main() {
     let vector = vec![10, 15, 20];
     tracing::event!(
         Level::WARN,
-        message = "add message field, and debug a vector",
+        message = "overwrite message, and debug a vector",
         ?vector,
     );
 }
 ```
-```json
-{
-  "level": "info",
-  "message": "only this message and level as text"
-}
-{
-  "level": "info",
-  "event_example": "add field and log it without a span"
-}
-{
-  "level": "warn",
-  "message": "add message field, and debug a vector",
-  "vector": "[10, 15, 20]"
-}
+```text
+06:47:00 INFO event triggered
+    event_example: add field and log it without a span
+
+06:47:00 WARN overwrite message, and debug a vector
+    vector: [10, 15, 20]
 ```
 
 ### Write to a file
@@ -269,13 +285,11 @@ And initializing it via the builder:
 
 [examples/file_writer.rs](examples/file_writer.rs)
 ```rust
-fn main() {
-    let file_appender = tracing_appender::rolling::hourly("./", "test.log");
-    traceon::builder().writer(file_appender).on();
-    tracing::info!("wow cool!");
-}
+let file_appender = tracing_appender::rolling::hourly("./", "test.log");
+traceon::builder().json().writer(file_appender).on();
+tracing::info!("wow cool!");
 ```
-The writer accepts anything that implements the `Write` trait
+The writer accepts anything that implements the `Write` trait, if you want to hold onto a buffer wrapped in an `Arc` and `Mutex` there is `buffer()` method on the builder.
 
 ### Compose with other layers
 You can also use the formatting layer with other tracing layers as you get more comfortable with the tracing ecosystem, for example to change the filter:
@@ -296,7 +310,8 @@ fn main() {
 ```
 
 ### Change the case of keys
-Often you'll be consuming different crates that implement their own traces and you need all their keys to match a certain format, this example also demonstrates how to use different instances of `traceon` for a given scope with `on_thread()`, which returns a guard so the subscriber is only running on the current thread, and will be turned off when the guard is dropped 
+Often you'll be consuming different crates that implement their own traces and you need all their keys to match a certain format, this example also demonstrates how to use different instances of `traceon` for a given scope with `on_thread()`, which returns a guard so the subscriber is only running on the current thread, and will be turned off when the guard is dropped.
+
 [examples/casing.rs](examples/casing.rs)
 ```rust
 use traceon::Case;
@@ -332,43 +347,8 @@ fn main() {
     );
 }
 ```
-### Pretty output
+Output:
 ![images/casing.svg](images/casing.svg)
-
-### Json output
-```json
-{
-  "Timestamp": "2023-01-01T01:10:58.337Z",
-  "Level": "INFO",
-  "Message": "PascalCase",
-  "CamelCase": "test",
-  "SnakeCase": "test"
-}
-{
-  "timestamp": "2023-01-01T01:10:58.338Z",
-  "level": "INFO",
-  "message": "camelCase",
-  "camelCase": "test",
-  "snakeCase": "test",
-  "pascalCase": "test",
-  "screamingSnakeCase": "test"
-}
-{
-  "timestamp": "2023-01-01T01:10:58.338Z",
-  "level": "INFO",
-  "camel_case": "test",
-  "screaming_snake_case": "test",
-  "pascal_case": "test",
-  "snake_case": "test",
-  "message": "snake_case"
-}
-```
-
-## Pretty Printing Output
-For pretty printing the output like the examples above, install [jq](https://stedolan.github.io/jq/download/) and run commands like:
-```bash
-cargo run | jq -R 'fromjson?'
-```
 
 ## Performance
 This crate uses the idea originated from: [LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter) of storing fields from visited spans in a `HashMap` instead of a `BTreeMap` which is more suited for flattening fields, and results in very similar performance to the json formatter in `tracing-subcriber`:

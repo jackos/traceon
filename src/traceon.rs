@@ -1,8 +1,7 @@
 use nu_ansi_term::{Color, Style};
 // use erased_serde::{Serialize, Serializer};
 use chrono::offset::TimeZone as TimeZoneTrait;
-use chrono::SecondsFormat;
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Local, SecondsFormat, Utc};
 use serde::ser::{SerializeMap, Serializer};
 use serde_json::Value;
 use std::{
@@ -18,46 +17,98 @@ use tracing_subscriber::{
     EnvFilter, Layer, Registry,
 };
 
+/// Private struct to initialize formatting and storage layers
+/// All members can be modified through public methods.
 #[derive(Clone)]
 pub struct Traceon {
-    writer: Arc<Mutex<dyn Write + Sync + Send>>,
+    json: bool,
     file: bool,
     module: bool,
-    span: bool,
+    span_format: SpanFormat,
+    case: Case,
     time: TimeFormat,
     timezone: TimeZone,
-    concat: Option<String>,
+    join_fields: JoinFields,
     level: LevelFormat,
-    case: Case,
-    json: bool,
+    writer: Arc<Mutex<dyn Write + Sync + Send>>,
 }
 
+/// Change case of keys
 #[derive(Clone)]
 pub enum Case {
+    /// Use original case for all keys
     None,
+    /// Convert all keys to camelCase
     Camel,
+    /// Convert all keys to PascalCase
     Pascal,
+    /// Convert all keys to snake_case
     Snake,
 }
 
+/// Format the log level
 #[derive(Copy, Clone)]
 pub enum LevelFormat {
+    /// Hide log levels
     None,
+    /// Log level uppercase e.g. WARN
     Uppercase,
+    /// Log level lowercase e.g. warn
     Lowercase,
+    /// Log level as numbers
+    ///     TRACE: 10
+    ///     DEBUG: 20
+    ///     INFO:  30
+    ///     WARN:  40
+    ///     ERROR: 50
     Number,
 }
 
+/// Format the span field
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum SpanFormat {
+    /// Turn of span field
+    None,
+    /// Nested children spans join parent spans e.g. parent_span::child_span
+    Join(&'static str),
+    /// Nested children spans overwrite parent spans
+    Overwrite,
+}
+
+impl Default for SpanFormat {
+    fn default() -> Self {
+        SpanFormat::Join("::")
+    }
+}
+
+/// Join fields with characters
+#[derive(Copy, Clone, Debug, Default)]
+pub enum JoinFields {
+    // All nested span fields will overwrite parent span fields
+    #[default]
+    Overwrite,
+    // All nested span fields will join with parent spans e.g JoinFields::All("::")
+    All(&'static str),
+    // Only declared nested span fields will join with parent spans e.g. JoinFields(Some("::", &["field_a", "field_b"]))
+    Some(&'static str, &'static [&'static str]),
+}
+
+/// Change the time formatting
 #[derive(Clone, PartialEq, Eq)]
 pub enum TimeFormat {
+    /// Turn off the time field
     None,
+    /// Unix epoch seconds since 1970-01-01 00:00:00 e.g. 1672574869
     EpochSeconds,
+    /// Unix epoch millseconds since 1970-01-01 00:00:00 e.g. 1672574869384
     EpochMilliseconds,
+    /// Unix epoch microseconds since 1970-01-01 00:00:00 e.g. 1672574869384925
     EpochMicroseconds,
+    /// Unix epoch nanoseconds since 1970-01-01 00:00:00 e.g. 1672575028752943000
     EpochNanoseconds,
-    /// Well known format e.g.
+    /// Well known format e.g. Sun, 01 Jan 2023 12:10:28 +0000
     RFC2822,
-    /// Well known format similar to ISO 8601 e.g. 2022-12-31T00:15:08.241974+00:00
+    /// Well known format like ISO 8601 e.g. 2022-12-31T00:15:08.241974+00:00
     RFC3339,
     /// Seconds format and bool to replace +00:00 timezone with Z e.g. (SecondsFormat::Secs, true) = 2022-12-31T00:15:08Z
     RFC3339Options(SecondsFormat, bool),
@@ -65,12 +116,16 @@ pub enum TimeFormat {
     PrettyTime,
     /// Pretty Print the date in format YYYY:MM::DD HH:mm:SS
     PrettyDateTime,
-    CustomFormat(String),
+    /// Use a format string to change the datetime formate e.g. YYYY:MM::DD HH:mm:SS
+    CustomFormat(&'static str),
 }
 
+/// Change the timezone
 #[derive(Clone)]
 pub enum TimeZone {
+    /// Use +00:00 timezone
     UTC,
+    /// Use local system time for the timezone
     Local,
 }
 
@@ -83,6 +138,7 @@ pub fn clean_json_value(value: &Value) -> String {
         .replace("\\n", "\n    ")
 }
 
+/// Convert a datetime to String based on the TimeFormat
 pub fn time_convert<Tz: TimeZoneTrait>(now: DateTime<Tz>, time: &TimeFormat) -> String
 where
     Tz::Offset: std::fmt::Display,
@@ -92,7 +148,7 @@ where
         TimeFormat::EpochSeconds => now.timestamp().to_string(),
         TimeFormat::EpochMilliseconds => now.timestamp_millis().to_string(),
         TimeFormat::EpochMicroseconds => now.timestamp_micros().to_string(),
-        TimeFormat::EpochNanoseconds => now.timestamp_subsec_nanos().to_string(),
+        TimeFormat::EpochNanoseconds => now.timestamp_nanos().to_string(),
         TimeFormat::RFC2822 => now.to_rfc2822(),
         TimeFormat::RFC3339 => now.to_rfc3339(),
         TimeFormat::RFC3339Options(seconds_format, use_z) => {
@@ -104,65 +160,34 @@ where
     }
 }
 
+/// Default values used for the builder
 impl Default for Traceon {
     #[must_use]
     fn default() -> Traceon {
         Traceon {
-            writer: Arc::new(Mutex::new(std::io::stdout())),
-            concat: Some("::".into()),
-            file: false,
-            span: false,
-            time: TimeFormat::RFC3339Options(SecondsFormat::Millis, true),
-            timezone: TimeZone::UTC,
-            module: false,
             json: false,
+            file: false,
+            module: false,
+            span_format: SpanFormat::Join("::"),
             case: Case::None,
+            time: TimeFormat::PrettyTime,
+            timezone: TimeZone::Local,
+            join_fields: JoinFields::Overwrite,
             level: crate::LevelFormat::Uppercase,
+            writer: Arc::new(Mutex::new(std::io::stdout())),
         }
     }
 }
 
 impl Traceon {
-    #[must_use]
-    pub fn pretty_default() -> Self {
-        Traceon {
-            writer: Arc::new(Mutex::new(std::io::stdout())),
-            concat: Some("::".into()),
-            file: true,
-            span: true,
-            time: TimeFormat::PrettyTime,
-            timezone: TimeZone::Local,
-            module: true,
-            json: true,
-            case: Case::None,
-            level: crate::LevelFormat::Uppercase,
-        }
-    }
-    pub fn json_default() -> Self {
-        Traceon {
-            writer: Arc::new(Mutex::new(std::io::stdout())),
-            concat: Some("::".into()),
-            file: true,
-            span: true,
-            time: TimeFormat::RFC3339,
-            timezone: TimeZone::UTC,
-            module: true,
-            json: false,
-            case: Case::None,
-            level: crate::LevelFormat::Uppercase,
-        }
-    }
-    /// Turn the file field on or off
+    /// Turn the file field on:
     /// ```
-    /// traceon::json().file(true).on();
-    /// tracing::info!("file field on");
+    /// traceon::builder().file().on();
     /// ```
     ///
-    /// ```json
-    /// {
-    ///     "message": "file field on",
-    ///     "file": "src/traceon.rs:68"
-    /// }
+    /// pretty output:
+    /// ```text
+    ///     file: src/traceon.rs:68
     /// ```
     #[must_use]
     pub fn file(&mut self) -> &mut Self {
@@ -170,113 +195,134 @@ impl Traceon {
         self
     }
 
-    /// Turn span fields on or off
+    /// Change formatting of span field, make children overrwrite the parent, or turn it off
     /// ```
-    /// traceon::json().span(true).on();
+    /// use traceon::SpanFormat;
+    ///
+    /// traceon::builder().span(SpanFormat::Join(">")).on();
+
     /// let _span = tracing::info_span!("level_1").entered();
     /// tracing::info!("span level 1");
-    ///
+
     /// let _span = tracing::info_span!("level_2").entered();
     /// tracing::info!("span level 2");
     /// ```
     ///
-    /// output:
+    /// Pretty output:
     ///
-    /// ```json
-    /// {
-    ///        "message": "span field is on",
-    ///        "span": "level_1"
-    ///    }
-    /// ```
-    /// ```json
-    ///    {
-    ///        "message": "span field is on",
-    ///        "span": "level_1::level_2"
-    ///    }
+    /// ```text
+    /// 12:30:02 INFO span level 1
+    ///     span: level_1
+    ///
+    /// 12:30:02 INFO span level 2
+    ///     span: level_1>level_2
     /// ```
     ///
     /// To turn off concatenation of span fields:
-    ///
     /// ```
-    /// traceon::json().concat(None).on();
-    /// let _span = tracing::info_span!("level_1").entered();
-    /// tracing::info!("span field is on");
+    /// use traceon::SpanFormat;
     ///
-    /// let _span = tracing::info_span!("level_2").entered();
-    /// tracing::info!("span field is on");
+    /// traceon::builder().span(SpanFormat::None);
     /// ```
     ///
-    /// output:
-    ///
-    /// ```json
-    /// {
-    ///        "message": "span field is on",
-    ///        "span": "level_1"
-    ///    }
     /// ```
-    /// ```json
-    ///    {
-    ///        "message": "span field is on",
-    ///        "span": "level_2"
-    ///    }
-    /// ```
-    ///
     #[must_use]
-    pub fn span(&mut self) -> &mut Self {
-        self.span = true;
+    pub fn span(&mut self, span_format: SpanFormat) -> &mut Self {
+        self.span_format = span_format;
         self
     }
 
-    /// Turn module on or off
+    /// Turn module field on
     /// ```
-    /// traceon::builder().module().writer(std::io::stderr()).on();
-    /// tracing::info!("short message");
+    /// traceon::builder().module().on();
+    /// ```
+    ///
+    /// pretty output:
+    /// ```text
+    ///     module: my_target::my_module
     /// ```
     #[must_use]
     pub fn module(&mut self) -> &mut Self {
         self.module = true;
         self
     }
+
+    /**
+    Choose to join (concatenate) values from the same field in nested spans:
+    ```
+    use traceon::JoinFields;
+    traceon::builder()
+        .join_fields(JoinFields::Some("||", &["field_b"]))
+        .on();
+
+    let _span_1 = tracing::info_span!("span_1", field_a = "original", field_b = "original").entered();
+    let _span_2 = tracing::info_span!("span_2", field_a = "changed", field_b = "changed").entered();
+
+    tracing::info!("testing field join");
+    ```
+
+    pretty output:
+    ```text
+    12:44:12 INFO testing field join
+        field_a: changed
+        field_b: original||changed
+        span:    span_1::span_1
+    ```
+    */
     #[must_use]
-    pub fn concat(&mut self, concat: Option<&str>) -> &mut Self {
-        if let Some(concat) = concat {
-            self.concat = Some(concat.to_string());
-        } else {
-            self.concat = None;
-        }
+    pub fn join_fields(&mut self, join_fields: JoinFields) -> &mut Self {
+        self.join_fields = join_fields;
         self
     }
+    /// Change time formatting
     #[must_use]
     pub fn time(&mut self, time_format: TimeFormat) -> &mut Self {
         self.time = time_format;
         self
     }
+    /// Change time formatting
     #[must_use]
     pub fn level(&mut self, level_format: LevelFormat) -> &mut Self {
         self.level = level_format;
         self
     }
+    /// Change timezone
     #[must_use]
     pub fn timezone(&mut self, timezone: TimeZone) -> &mut Self {
         self.timezone = timezone;
         self
     }
+    /// Use json formatting instead of pretty formatting
     #[must_use]
     pub fn json(&mut self) -> &mut Self {
         self.json = true;
         self
     }
+    /// Use any writer that is threadsafe and implements the `Write` trait
     #[must_use]
     pub fn writer(&mut self, writer: impl Write + Send + Sync + 'static) -> &mut Self {
         self.writer = Arc::new(Mutex::new(writer));
         self
     }
+    /// Write to a buffer that you can share between threads by wrapping it in an Arc and Mutex
+    #[must_use]
+    pub fn buffer(&mut self, buffer: Arc<Mutex<impl Write + Send + Sync + 'static>>) -> &mut Self {
+        self.writer = buffer;
+        self
+    }
+    /// Change casing of keys to match a specefic format
     #[must_use]
     pub fn case(&mut self, case: Case) -> &mut Self {
         self.case = case;
         self
     }
 
+    /// Turn on the storage, formatting and filter layers as a global default, which means all threads will inherit it but it can
+    /// be overwritten for a single thread with for example: `let _guard = traceon::builder().on_thread();`
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the global default subscriber is already set, use `try_on` instead to return a `Result`
     pub fn on(&self) {
         let env_filter =
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
@@ -287,7 +333,10 @@ impl Traceon {
             .expect("more than one global default subscriber set");
     }
 
-    /// Use the defaults and set the global default subscriber
+    /// Turn on the storage, formatting and filter layers as a global default, which means all threads will inherit it but it can
+    /// be overwritten for a single thread with for example: `let _guard = traceon::builder().on_thread();`
+    ///
+    /// Returns a result which will be an error if the global default subscriber is already set
     pub fn try_on(&self) -> Result<(), tracing::subscriber::SetGlobalDefaultError> {
         let env_filter =
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
@@ -296,6 +345,26 @@ impl Traceon {
         tracing::subscriber::set_global_default(subscriber)
     }
 
+    /** Turn on the storage, formatting and filter layers on the local thread returning a guard, when the guard is dropped the
+    layers will be unsubscribed.
+
+    # Examples
+
+    ```
+    // Turn on the subscriber with json formatting
+    let _span = tracing::info_span!("the storage layer in this subscriber will have a field", field = "temp");
+    let _guard = traceon::builder().json().on_thread();
+    tracing::info!("first subscriber");
+
+
+    // Drop the previous subscriber and storage for the fields, this new one has pretty formatting
+    let _span = tracing::info!("the storage layer has been reset");
+    let _guard = traceon::builder().on_thread();
+    tracing::info!("second subscriber")
+    ```
+
+    Returns a result which will be an error if the global default subscriber is already set
+    */
     pub fn on_thread(&self) -> tracing::subscriber::DefaultGuard {
         let env_filter =
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
@@ -304,17 +373,6 @@ impl Traceon {
         tracing::subscriber::set_default(subscriber)
     }
 
-    pub fn format_field(
-        &self,
-        key: &str,
-        value: &str,
-        buffer: &mut Vec<u8>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        if !self.json && key.to_ascii_lowercase() != "message" {
-            writeln!(buffer, "{}: {}", key, value)?;
-        };
-        Ok(())
-    }
     /// Serialize a single event
     fn serialize<S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>>(
         &self,
@@ -332,8 +390,8 @@ impl Traceon {
         event.record(event_visitor);
 
         let (level_key, file_key, module_key, timestamp_key) = match self.case {
-            Case::Pascal => ("Level", "File", "Module", "Timestamp"),
-            _ => ("level", "file", "module", "timestamp"),
+            Case::Pascal => ("Level", "File", "Module", "Time"),
+            _ => ("level", "file", "module", "time"),
         };
 
         let metadata = event.metadata();
@@ -511,7 +569,7 @@ where
     S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
 {
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
-        let mut event_visitor = JsonStorage::new(self.concat.clone());
+        let mut event_visitor = JsonStorage::new(self.join_fields, self.span_format);
         match self.serialize(event, ctx, &mut event_visitor) {
             Ok(mut buffer) => {
                 buffer.write_all(b"\n").unwrap();
@@ -537,28 +595,36 @@ where
                 .get_mut::<JsonStorage>()
                 .map(|v| v.to_owned())
                 .unwrap_or_default();
-            if let Some(orig) = storage
-                .values
-                .insert(span_key, serde_json::Value::from(span.metadata().name()))
-            {
-                if let Some(concat) = &self.concat {
-                    storage.values.insert(
-                        span_key,
-                        serde_json::Value::from(format!(
-                            "{}{}{}",
-                            orig.as_str().unwrap_or(""),
-                            concat,
-                            span.metadata().name()
-                        )),
-                    );
-                }
-            };
+            if self.span_format != SpanFormat::None {
+                if let Some(orig) = storage
+                    .values
+                    .insert(span_key, serde_json::Value::from(span.metadata().name()))
+                {
+                    match self.span_format {
+                        SpanFormat::Overwrite => (),
+                        SpanFormat::Join(concat) => {
+                            storage.values.insert(
+                                span_key,
+                                serde_json::Value::from(format!(
+                                    "{}{}{}",
+                                    orig.as_str().unwrap_or(""),
+                                    concat,
+                                    span.metadata().name()
+                                )),
+                            );
+                        }
+                        SpanFormat::None => (),
+                    }
+                };
+            }
             storage
         } else {
-            let mut storage = JsonStorage::new(self.concat.clone());
-            storage
-                .values
-                .insert(span_key, serde_json::Value::from(span.metadata().name()));
+            let mut storage = JsonStorage::new(self.join_fields, self.span_format);
+            if self.span_format != SpanFormat::None {
+                storage
+                    .values
+                    .insert(span_key, serde_json::Value::from(span.metadata().name()));
+            }
             storage
         };
 
@@ -583,14 +649,16 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct JsonStorage<'a> {
     pub values: HashMap<&'a str, serde_json::Value>,
-    pub concat: Option<String>,
+    pub join_fields: JoinFields,
+    pub span_format: SpanFormat,
 }
 
 impl<'a> JsonStorage<'a> {
-    pub fn new(concat: Option<String>) -> Self {
+    pub fn new(join_fields: JoinFields, span_format: SpanFormat) -> Self {
         JsonStorage {
             values: HashMap::new(),
-            concat,
+            join_fields,
+            span_format,
         }
     }
 }
@@ -664,12 +732,31 @@ impl Visit for JsonStorage<'_> {
             .values
             .insert(field.name(), serde_json::Value::from(value))
         {
-            // If self.concat is Some(_), instead of replacing value concatenate it
-            if let Some(concat) = &self.concat {
-                let orig = orig.as_str().unwrap_or("");
-                let new = format!("{orig}{}{value}", concat);
-                self.values
-                    .insert(field.name(), serde_json::Value::from(new));
+            if field.name().to_ascii_lowercase() == "span" {
+                if let SpanFormat::Join(chars) = self.span_format {
+                    let orig = orig.as_str().unwrap_or("");
+                    let new = format!("{orig}{chars}{value}");
+                    self.values
+                        .insert(field.name(), serde_json::Value::from(new));
+                }
+            } else {
+                match self.join_fields {
+                    JoinFields::Overwrite => (),
+                    JoinFields::All(chars) => {
+                        let orig = orig.as_str().unwrap_or("");
+                        let new = format!("{orig}{chars}{value}");
+                        self.values
+                            .insert(field.name(), serde_json::Value::from(new));
+                    }
+                    JoinFields::Some(chars, fields) => {
+                        if fields.contains(&field.to_string().as_str()) {
+                            let orig = orig.as_str().unwrap_or("");
+                            let new = format!("{orig}{chars}{value}");
+                            self.values
+                                .insert(field.name(), serde_json::Value::from(new));
+                        }
+                    }
+                }
             }
         }
     }

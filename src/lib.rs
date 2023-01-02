@@ -1,68 +1,58 @@
 #![doc = include_str!("../README.md")]
 mod traceon;
-pub use crate::traceon::{Case, LevelFormat, TimeFormat, TimeZone, Traceon};
+use crate::traceon::Traceon;
+pub use crate::traceon::{Case, JoinFields, LevelFormat, SpanFormat, TimeFormat, TimeZone};
 
 pub use chrono::SecondsFormat;
 pub use tracing;
-use tracing::subscriber::DefaultGuard;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::{EnvFilter, Registry};
 
-/// Returns a builder that can be configured before being turned on, or used as a layer for a subscriber.
-/// All the options are shown in the example below.
-/// ```
-/// use traceon::{LevelFormat, Case};
-/// traceon::builder()
-///     // Turn off the default fields
-///     .file(false)
-///     .span(false)
-///     .module(false)
-///     .timestamp(false)
-///     // Set the log level to text instead of numbers
-///     .level(LevelFormat::Lowercase)
-///     // Rename the json keys to match a case
-///     .case(Case::Snake)
-///     // Concatentate fields that are repeated in nested spans, or turn off with ""
-///     .concat(Some("::"))
-///     // Send output to anything that implements `std::io::Write`
-///     .writer(std::io::stderr());
-/// ```
-pub fn json() {
-    Traceon::json_default().on()
+/** Returns a builder that can be configured before being turned on, or used as a layer for a subscriber.
+ All the options are shown in the example below.
+```
+use traceon::{Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, TimeZone};
+
+traceon::builder()
+    // Add field with source code filename and line number e.g. src/main.rs:10
+    .file()
+    // Add field with target and module path e.g. mybinary::mymodule::submodule
+    .module()
+    // Turn off field with joined span name where the event occured e.g. parentspan::childspan
+    .span(SpanFormat::Overwrite)
+    // If the time is recorded in local system timezone or UTC
+    .timezone(TimeZone::UTC)
+    // Change the formatting of the time to RFC3339 with Seconds and Zulu
+    .time(TimeFormat::RFC3339Options(SecondsFormat::Secs, true))
+    // Change the casing of all the key names e.g. `camelCase` to `snake_case`
+    .case(Case::Snake)
+    // The characters used to concatenate field values that repeat in nested spans. Defaults to ::
+    .join_fields(JoinFields::All("::"))
+    // Turn on json formatting instead of pretty output
+    .json()
+    // Change level value formatting to numbers for easier filtering
+    // trace: 10
+    // debug: 20
+    // info:  30
+    // warn:  40
+    // error: 50
+    .level(LevelFormat::Number)
+    // Put anything that implements Write here to redirect output
+    .writer(std::io::stderr())
+    // This will activate it globally on all threads!
+    .on();
+
+tracing::info!("a simple message");
+```
+json output:
+```json
+{
+    "timestamp": "2023-01-01T12:58:49Z",
+    "level": 30,
+    "module": "builder",
+    "file": "examples/builder.rs:32",
+    "message": "a simple message"
 }
-
-pub fn pretty() {
-    Traceon::pretty_default().on()
-}
-
+```
+*/
 pub fn builder() -> Traceon {
     Traceon::default()
-}
-
-/// Use the defaults and set the global default subscriber
-pub fn on() {
-    let traceon = Traceon::default();
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = Registry::default().with(traceon).with(env_filter);
-
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("more than one global default subscriber set");
-}
-
-/// Use the defaults and set the global default subscriber
-pub fn try_on() -> Result<(), tracing::subscriber::SetGlobalDefaultError> {
-    let traceon = Traceon::default();
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = Registry::default().with(traceon).with(env_filter);
-
-    tracing::subscriber::set_global_default(subscriber)
-}
-
-/// Use the defaults and set the global default subscriber
-pub fn on_thread() -> DefaultGuard {
-    let traceon = Traceon::default();
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = Registry::default().with(traceon).with(env_filter);
-
-    tracing::subscriber::set_default(subscriber)
 }
