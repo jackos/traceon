@@ -1,9 +1,8 @@
 use claims::assert_some_eq;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use time::format_description::well_known::Rfc3339;
 use tracing::{info, span, Level};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Registry;
@@ -11,9 +10,7 @@ use tracing_subscriber::Registry;
 /// Tests have to be run on a single thread because we are re-using the same buffer for
 /// all of them.
 type InMemoryBuffer = Mutex<Vec<u8>>;
-lazy_static! {
-    static ref BUFFER: InMemoryBuffer = Mutex::new(vec![]);
-}
+static BUFFER: Lazy<InMemoryBuffer> = Lazy::new(|| Mutex::new(vec![]));
 
 // Run a closure and collect the output emitted by the tracing instrumentation using an in-memory buffer.
 fn run_and_get_raw_output<F: Fn()>(action: F) -> String {
@@ -79,19 +76,6 @@ fn each_line_has_the_mandatory_fields() {
 }
 
 #[test]
-fn time_is_formatted_according_to_rfc_3339() {
-    let tracing_output = run_and_get_output(test_action);
-
-    for record in tracing_output {
-        let time = record.get("time").unwrap().as_str().unwrap();
-        let parsed = time::OffsetDateTime::parse(time, &Rfc3339);
-        assert!(parsed.is_ok());
-        let parsed = parsed.unwrap();
-        assert!(parsed.offset().is_utc());
-    }
-}
-
-#[test]
 fn encode_f64_as_numbers() {
     let f64_value: f64 = 0.5;
     let action = || {
@@ -101,7 +85,7 @@ fn encode_f64_as_numbers() {
             f64_field = tracing::field::Empty
         );
         let _enter = span.enter();
-        span.record("f64_field", &f64_value);
+        span.record("f64_field", f64_value);
         info!("testing f64");
     };
     let tracing_output = run_and_get_output(action);

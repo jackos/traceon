@@ -1,8 +1,7 @@
-use traceon::Case;
-use tracing::Level;
+use traceon::{event, Case, Level};
 fn main() {
     let _guard = traceon::builder().case(Case::Pascal).on_thread();
-    tracing::event!(
+    event!(
         Level::INFO,
         message = "PascalCase",
         PascalCase = "test",
@@ -11,7 +10,7 @@ fn main() {
         SCREAMING_SNAKE_CASE = "test",
     );
     let _guard = traceon::builder().case(Case::Camel).on_thread();
-    tracing::event!(
+    event!(
         Level::INFO,
         message = "camelCase",
         PascalCase = "test",
@@ -21,7 +20,7 @@ fn main() {
     );
     let _guard = traceon::builder().case(Case::Snake).on_thread();
 
-    tracing::event!(
+    event!(
         Level::INFO,
         message = "snake_case",
         PascalCase = "test",

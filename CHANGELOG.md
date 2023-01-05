@@ -1,4 +1,7 @@
 # Changelog
+## [0.2.1] - 2022-01-01
+- Improve docs, cleanup dependencies
+
 ## [0.2.0] - 2022-01-01
 - Settle on public API, fix docs
 

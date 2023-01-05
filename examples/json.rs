@@ -1,4 +1,4 @@
 fn main() {
-    traceon::builder().json().on();
-    tracing::info!("a simple message");
+    traceon::json();
+    traceon::info!("wow it works");
 }

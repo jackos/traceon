@@ -9,9 +9,12 @@ use std::{
     io::Write,
     sync::{Arc, Mutex},
 };
-use tracing::{field::Visit, span::Attributes, Event, Id, Subscriber};
-use tracing_core::Field;
-use tracing_log::AsLog;
+use tracing::Level;
+use tracing::{
+    field::{Field, Visit},
+    span::Attributes,
+    Event, Id, Subscriber,
+};
 use tracing_subscriber::{
     layer::{Context, SubscriberExt},
     EnvFilter, Layer, Registry,
@@ -84,12 +87,12 @@ impl Default for SpanFormat {
 /// Join fields with characters
 #[derive(Copy, Clone, Debug, Default)]
 pub enum JoinFields {
-    // All nested span fields will overwrite parent span fields
     #[default]
+    /// All nested span fields will overwrite parent span fields
     Overwrite,
-    // All nested span fields will join with parent spans e.g JoinFields::All("::")
+    /// All nested span fields will join with parent spans e.g JoinFields::All("::")
     All(&'static str),
-    // Only declared nested span fields will join with parent spans e.g. JoinFields(Some("::", &["field_a", "field_b"]))
+    /// Only declared nested span fields will join with parent spans e.g. JoinFields(Some("::", &["field_a", "field_b"]))
     Some(&'static str, &'static [&'static str]),
 }
 
@@ -170,8 +173,8 @@ impl Default for Traceon {
             module: false,
             span_format: SpanFormat::Join("::"),
             case: Case::None,
-            time: TimeFormat::PrettyTime,
-            timezone: TimeZone::Local,
+            time: TimeFormat::RFC3339,
+            timezone: TimeZone::UTC,
             join_fields: JoinFields::Overwrite,
             level: crate::LevelFormat::Uppercase,
             writer: Arc::new(Mutex::new(std::io::stdout())),
@@ -345,7 +348,8 @@ impl Traceon {
         tracing::subscriber::set_global_default(subscriber)
     }
 
-    /** Turn on the storage, formatting and filter layers on the local thread returning a guard, when the guard is dropped the
+    /**
+    Turn on the storage, formatting and filter layers on the local thread returning a guard, when the guard is dropped the
     layers will be unsubscribed.
 
     # Examples
@@ -436,12 +440,12 @@ impl Traceon {
                 }
             }
             LevelFormat::Number => {
-                let number = match metadata.level().as_log() {
-                    log::Level::Error => 50u16,
-                    log::Level::Warn => 40,
-                    log::Level::Info => 30,
-                    log::Level::Debug => 20,
-                    log::Level::Trace => 10,
+                let number = match *metadata.level() {
+                    Level::TRACE => 10,
+                    Level::DEBUG => 20,
+                    Level::INFO => 30,
+                    Level::WARN => 40,
+                    Level::ERROR => 50,
                 };
 
                 if self.json {
@@ -455,12 +459,12 @@ impl Traceon {
         // let x = d.format(&format).expect("Failed to format the time");
 
         if !self.json {
-            let style = match event.metadata().level().as_log() {
-                log::Level::Trace => Style::new().fg(Color::Purple),
-                log::Level::Debug => Style::new().fg(Color::Blue),
-                log::Level::Info => Style::new().fg(Color::Green),
-                log::Level::Warn => Style::new().fg(Color::Yellow),
-                log::Level::Error => Style::new().fg(Color::Red),
+            let style = match *event.metadata().level() {
+                Level::TRACE => Style::new().fg(Color::Purple),
+                Level::DEBUG => Style::new().fg(Color::Blue),
+                Level::INFO => Style::new().fg(Color::Green),
+                Level::WARN => Style::new().fg(Color::Yellow),
+                Level::ERROR => Style::new().fg(Color::Red),
             };
 
             if let Some(value) = event_visitor.values.get("message") {

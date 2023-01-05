@@ -1,6 +1,8 @@
-#[tracing::instrument]
+use traceon::{info, instrument};
+
+#[instrument]
 async fn add(a: i32, b: i32) {
-    tracing::info!("result: {}", a + b);
+    info!("result = {}", a + b);
 }
 
 #[tokio::main]

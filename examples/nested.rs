@@ -1,20 +1,20 @@
-use tracing::{info_span, instrument};
+use traceon::{info_span, instrument, Instrument};
 
 #[instrument]
-fn span_one(a: &str, b: &str) {
+async fn span_one(a: &str, b: &str) {
     tracing::info!("hello!");
-    span_two("two_a", "two_b")
+    span_two("two_a", "two_b").await;
 }
 
 #[instrument]
-fn span_two(a: &str, b: &str) {
+async fn span_two(a: &str, b: &str) {
     tracing::info!("hello again!");
 }
 
 #[tokio::main]
 async fn main() {
     traceon::builder().on();
-    let _span = info_span!("how about this message?", wow = 50, cool = 200).entered();
+    let span = info_span!("base_span", wow = 50, cool = 200);
     tracing::info!("first");
-    span_one("one_a", "one_b");
+    span_one("one_a", "one_b").instrument(span).await;
 }
