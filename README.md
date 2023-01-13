@@ -61,7 +61,7 @@ Outputs one line of flattened json per event, this example is prettified:
 It's configurable through the builder if you want to change any of the defaults
 
 ```rust
-use traceon::{Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, Timezone, info};
+use traceon::{Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, TimeZone, info};
 fn main() {
     traceon::builder()
         // Add field with source code filename and line number e.g. src/main.rs:10
@@ -71,7 +71,7 @@ fn main() {
         // Turn off field with joined span name where the event occured e.g. parentspan::childspan
         .span(SpanFormat::None)
         // If the time is recorded in local system timezone or UTC
-        .timezone(Timezone::UTC)
+        .timezone(TimeZone::UTC)
         // Change the formatting of the time to RFC3339 with Seconds and Zulu
         .time(TimeFormat::RFC3339Options(SecondsFormat::Secs, true))
         // Change the casing of all the key names e.g. `camelCase` to `snake_case`

@@ -1,11 +1,11 @@
-use traceon::{SecondsFormat, TimeFormat, Timezone};
+use traceon::{SecondsFormat, TimeFormat, TimeZone};
 fn main() {
     let _guard = traceon::builder().on_thread();
     tracing::info!("Default RFC3339 with zulu/utc time and milliseconds");
 
     let _guard = traceon::builder()
         .time(TimeFormat::PrettyTime)
-        .timezone(Timezone::Local)
+        .timezone(TimeZone::Local)
         .on_thread();
     tracing::info!("Pretty and local time");
 
@@ -16,7 +16,7 @@ fn main() {
 
     let _guard = traceon::builder()
         .time(TimeFormat::RFC3339Options(SecondsFormat::Secs, false))
-        .timezone(Timezone::Local)
+        .timezone(TimeZone::Local)
         .on_thread();
     tracing::info!("RFC3339 with timezone");
 

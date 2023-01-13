@@ -16,17 +16,10 @@ tracing-core = { path = "../tracing-core", version = "0.2" }
 tracing-error = { path = "../tracing-error" }
 tracing-flame = { path = "../tracing-flame" }
 tracing-tower = { version = "0.1.0", path = "../tracing-tower" }
-tracing-subscriber = { path = "../tracing-subscriber", version = "0.3", features = [
-	"json",
-	"env-filter",
-] }
-tracing-futures = { version = "0.3", path = "../tracing-futures", features = [
-	"futures-01",
-] }
+tracing-subscriber = { path = "../tracing-subscriber", version = "0.3", features = ["json", "env-filter"] }
+tracing-futures = { version = "0.3", path = "../tracing-futures", features = ["futures-01"] }
 tracing-attributes = { path = "../tracing-attributes", version = "0.2" }
-tracing-log = { path = "../tracing-log", version = "0.2", features = [
-	"env_logger",
-] }
+tracing-log = { path = "../tracing-log", version = "0.2", features = ["env_logger"] }
 tracing-serde = { path = "../tracing-serde" }
 tracing-opentelemetry = { path = "../tracing-opentelemetry" }
 tracing-appender = { path = "../tracing-appender" }
@@ -60,9 +53,7 @@ inferno = "0.11.6"
 tempfile = "3.3.0"
 
 # opentelemetry example
-opentelemetry = { version = "0.18.0", default-features = false, features = [
-	"trace",
-] }
+opentelemetry = { version = "0.18.0", default-features = false, features = ["trace"] }
 opentelemetry-jaeger = "0.17.0"
 
 # fmt examples

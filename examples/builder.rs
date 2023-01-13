@@ -1,5 +1,5 @@
 use traceon::{
-    info, Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, Timezone,
+    info, Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, TimeZone,
 };
 
 fn main() {
@@ -11,7 +11,7 @@ fn main() {
         // Turn off field with joined span name where the event occured e.g. parentspan::childspan
         .span(SpanFormat::None)
         // If the time is recorded in local system timezone or UTC
-        .timezone(Timezone::UTC)
+        .timezone(TimeZone::UTC)
         // Change the formatting of the time to RFC3339 with Seconds and Zulu
         .time(TimeFormat::RFC3339Options(SecondsFormat::Secs, true))
         // Change the casing of all the key names e.g. `camelCase` to `snake_case`

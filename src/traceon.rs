@@ -34,6 +34,7 @@ pub struct Traceon {
     join_fields: JoinFields,
     level: LevelFormat,
     writer: Arc<Mutex<dyn Write + Sync + Send>>,
+    message_key: &'static str,
 }
 
 /// Change case of keys
@@ -171,6 +172,7 @@ impl Default for Traceon {
             json: false,
             file: false,
             module: false,
+            message_key: "message",
             span_format: SpanFormat::Join("::"),
             case: Case::None,
             time: TimeFormat::RFC3339,
@@ -232,6 +234,24 @@ impl Traceon {
     #[must_use]
     pub fn span(&mut self, span_format: SpanFormat) -> &mut Self {
         self.span_format = span_format;
+        self
+    }
+
+    /// Change the key for the message field when using the json formatter
+    /// ```
+    /// traceon::builder().json().message_key("msg").on();
+    /// traceon::info!("the message key is now msg");
+    /// ```
+    ///
+    /// json output:
+    /// ```json
+    /// {
+    ///     "msg": "the message key is now msg"
+    /// }
+    /// ```
+    #[must_use]
+    pub fn message_key(&mut self, message_key: &'static str) -> &mut Self {
+        self.message_key = message_key;
         self
     }
 
@@ -456,7 +476,6 @@ impl Traceon {
             }
             LevelFormat::None => (),
         }
-        // let x = d.format(&format).expect("Failed to format the time");
 
         if !self.json {
             let style = match *event.metadata().level() {
@@ -507,7 +526,10 @@ impl Traceon {
         }
 
         // Add all the fields from the current event.
-        for (key, value) in event_visitor.values.iter() {
+        for (mut key, value) in event_visitor.values.iter() {
+            if self.json && key == &"message" {
+                key = &self.message_key;
+            }
             let key = match self.case {
                 Case::Snake => snake(key),
                 Case::Pascal => pascal(key),

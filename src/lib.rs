@@ -12,7 +12,7 @@ pub use tracing::{
 
 /** Returns a builder that can be configured before being turned on, or used as a layer for a subscriber.
 ```
-use traceon::{Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, Timezone, info};
+use traceon::{Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, TimeZone, info};
 traceon::builder()
     // Add field with source code filename and line number e.g. src/main.rs:10
     .file()
@@ -21,7 +21,7 @@ traceon::builder()
     // Turn off field with joined span name where the event occured e.g. parentspan::childspan
     .span(SpanFormat::None)
     // If the time is recorded in local system timezone or UTC
-    .timezone(Timezone::UTC)
+    .timezone(TimeZone::UTC)
     // Change the formatting of the time to RFC3339 with Seconds and Zulu
     .time(TimeFormat::RFC3339Options(SecondsFormat::Secs, true))
     // Change the casing of all the key names e.g. `camelCase` to `snake_case`

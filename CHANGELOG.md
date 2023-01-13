@@ -1,11 +1,13 @@
 # Changelog
-## [0.2.1] - 2022-01-01
-- Improve docs, cleanup dependencies
+## [0.3.0] - 2023-01-13
+- Add field for changing the message key when using the json formatter
+### Breaking changes
+- Change Timezone struct name to TimeZone for consistency and to match chrono
 
-## [0.2.0] - 2022-01-01
+## [0.2.0] - 2023-01-01
 - Settle on public API, fix docs
 
-## [0.1.8] - 2022-01-01
+## [0.1.8] - 2023-01-01
 - Add pretty printing and time formatting
 
 ## [0.1.7] - 2022-12-29
