@@ -152,7 +152,7 @@ where
         TimeFormat::EpochSeconds => now.timestamp().to_string(),
         TimeFormat::EpochMilliseconds => now.timestamp_millis().to_string(),
         TimeFormat::EpochMicroseconds => now.timestamp_micros().to_string(),
-        TimeFormat::EpochNanoseconds => now.timestamp_nanos().to_string(),
+        TimeFormat::EpochNanoseconds => now.timestamp_nanos_opt().unwrap_or(0).to_string(),
         TimeFormat::RFC2822 => now.to_rfc2822(),
         TimeFormat::RFC3339 => now.to_rfc3339(),
         TimeFormat::RFC3339Options(seconds_format, use_z) => {
@@ -696,11 +696,7 @@ fn snake(key: &str) -> String {
         if i > 0 && ch.is_uppercase() && !upper_or_underscore_last {
             snake.push('_');
         }
-        if ch.is_uppercase() || ch == '_' {
-            upper_or_underscore_last = true;
-        } else {
-            upper_or_underscore_last = false;
-        }
+        upper_or_underscore_last = ch.is_uppercase() || ch == '_';
         snake.push(ch.to_ascii_lowercase());
     }
     snake

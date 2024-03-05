@@ -1,7 +1,8 @@
 # Traceon - trace on
+
 An easy to use log and tracing formatter with a flattened json or pretty output.
 
-It builds on and simplifies the `tracing` crate, which adds context to log messages for better observability especially in async or multithreaded contexts, it focuses on logging all the associated context in flattened json or pretty print for every event, and is not concerned with span timings [which can be done in a separate layer such as opentelemtry if required](#Compose-with-other-layers)
+It builds on and simplifies the `tracing` crate, which adds context to log messages for better observability especially in async or multithreaded contexts, it focuses on logging all the associated context in flattened json or pretty print for every event, and is not concerned with span timings [which can be done in a separate layer such as opentelemetry if required](#compose-with-other-layers)
 
 [the detailed tracing docs are here](https://docs.rs/tracing/latest/tracing/).
 
@@ -90,8 +91,8 @@ fn main() {
         // Put anything that implements `Write` here to redirect output
         .writer(std::io::stderr())
         // on() activates it globally on all threads and panic if a global subcriber is already set
-		// try_on() will return an error if a global subscriber is already set
-		// on_thread() will return a guard so the subscriber will only be active in the current scope and thread
+        // try_on() will return an error if a global subscriber is already set
+        // on_thread() will return a guard so the subscriber will only be active in the current scope and thread
         .on();
 
     info!("a simple message");
@@ -102,11 +103,11 @@ Output
 
 ```json
 {
-	"timestamp": "2023-01-01T03:26:48Z",
-	"level": 30,
-	"module": "builder",
-	"file": "examples/builder.rs:27",
-	"message": "a simple message"
+    "timestamp": "2023-01-01T03:26:48Z",
+    "level": 30,
+    "module": "builder",
+    "file": "examples/builder.rs:27",
+    "message": "a simple message"
 }
 ```
 
@@ -115,6 +116,7 @@ Output
 ## Examples
 
 ### \#\[instrument\] macro
+
 You can use the `traceon::instrument` macro with both `async` and normal functions to capture the arguments used in each function call:
 
 ```rust
@@ -140,6 +142,7 @@ async fn main() {
 ```
 
 ### Instrument trait
+
 If you need to add additional context to an async function, you can create a span and instrument it:
 
 ```rust
@@ -162,7 +165,9 @@ async fn main() {
     package_name: traceon
     span:         math_functions
 ```
+
 The above `package_name` comes from `Cargo.toml` at compile time and is saved to the binary for runtime:
+
 ```toml
 [package]
 name = "traceon"
@@ -171,6 +176,7 @@ name = "traceon"
 ### Entered spans
 
 This creates a span and returns a guard, as long as that guard is in scope the span will be active:
+
 ```rust
 fn add(a: i32, b: i32) {
     tracing::info!("result: {}", a + b);
@@ -190,14 +196,15 @@ fn main() {
 ```
 
 > **Warning**
-> If `add()` was an `async fn`, holding onto the guard would cause memory leaks and information loss, you must use the above `instrument` macro or trait instead, [more details here](https://docs.rs/tracing/latest/tracing/struct.Span.html#in-asynchronous-code) 
+> If `add()` was an `async fn`, holding onto the guard would cause memory leaks and information loss, you must use the above `instrument` macro or trait instead, [more details here](https://docs.rs/tracing/latest/tracing/struct.Span.html#in-asynchronous-code)
 
 > **Note**
 > Just remember don't call `.await` while holding onto a guard
 
-
 ### Nested spans
+
 By default the span name will be joined with the characters `::` for nested spans:
+
 ```rust
 use traceon::{instrument, info};
 
@@ -212,6 +219,7 @@ fn main() {
     add(5, 10);
 }
 ```
+
 ```text
 06:33:57 INFO result: 15
     a:            5
@@ -221,6 +229,7 @@ fn main() {
 ```
 
 You can set this to overwrite if you prefer:
+
 ```rust
 use traceon::SpanFormat;
 traceon::builder().span(SpanFormat::Overwrite).on();
@@ -239,8 +248,8 @@ By default all the other fields overwrite if a nested span has the same field na
 ```rust
 use traceon::{JoinFields, info, info_span};
 traceon::builder()
-	.join_fields(JoinFields::Some("||", &["field_b"]))
-	.on();
+    .join_fields(JoinFields::Some("||", &["field_b"]))
+    .on();
 
 let _span_1 = info_span!("span_1", field_a = "original", field_b = "original").entered();
 let _span_2 = info_span!("span_2", field_a = "changed", field_b = "changed").entered();
@@ -249,17 +258,20 @@ info!("testing field join");
 ```
 
 output:
+
 ```text
 12:44:12 INFO testing field join
-	field_a: changed
-	field_b: original||changed
-	span:    span_1::span_1
+    field_a: changed
+    field_b: original||changed
+    span:    span_1::span_1
 ```
 
 ### Change the case of keys
+
 Often you'll be consuming different crates that implement their own traces and you need all their keys to match a certain format, this example also demonstrates how to use different instances of `traceon` for a given scope with `on_thread()`, which returns a guard so the subscriber is only running on the current thread, and will be turned off when the guard is dropped.
 
 [examples/casing.rs](examples/casing.rs)
+
 ```rust
 use traceon::{Case, Level, event};
 
@@ -295,7 +307,9 @@ fn main() {
     );
 }
 ```
+
 Output:
+
 ```text
 10:06:38 INFO PascalCase
     CamelCase:          test
@@ -316,8 +330,8 @@ Output:
     snake_case:           test
 ```
 
-
 ### Event
+
 `tracing::event!` allows you to add fields to message without having to create a span, just remember to put the level e.g. `tracing::Level::INFO` as the first parameter, this also shows how to create a custom message in an event, and how to output a `Debug` implementation:
 
 ```rust
@@ -339,6 +353,7 @@ fn main() {
     );
 }
 ```
+
 ```text
 06:47:00 INFO event triggered
     event_example: add field and log it without a span
@@ -348,14 +363,18 @@ fn main() {
 ```
 
 ### Write to a file
+
 If you wanted to write to log files instead of std, it's as simple adding the dependency to `Cargo.toml`:
+
 ```toml
 [dependencies]
 tracing-appender = "0.2.2"
 ```
-And initializing it via the builder: 
+
+And initializing it via the builder:
 
 [examples/file_writer.rs](examples/file_writer.rs)
+
 ```rust
 use traceon::info;
 
@@ -363,37 +382,46 @@ let file_appender = tracing_appender::rolling::hourly("./", "test.log");
 traceon::builder().json().writer(file_appender).on();
 info!("wow cool!");
 ```
+
 The writer accepts anything that implements the `Write` trait, if you want to hold onto a buffer wrapped in an `Arc` and `Mutex` there is `buffer()` method on the builder.
 
 ### Compose with other layers
-You can also use the formatting layer with other tracing layers as you get more comfortable with the tracing ecosystem, for example to add opentelemtry and change the filter:
+
+You can also use the formatting layer with other tracing layers as you get more comfortable with the tracing ecosystem, for example to add opentelemetry:
 
 ```rust
-use opentelemetry::global;
-use traceon::{error, info};
-use tracing_subscriber::{prelude::*, EnvFilter};
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry_sdk::trace::TracerProvider;
+use opentelemetry_stdout as stdout;
+use tracing::{info, span};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::Registry;
 
 fn main() {
-    let tracer = opentelemetry_jaeger::new_agent_pipeline()
-        .with_service_name("traceon_jaeger")
-        .install_simple()
-        .unwrap();
-    let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-    tracing_subscriber::registry()
-        .with(traceon::builder())
-        .with(EnvFilter::new("debug"))
-        .with(opentelemetry)
-        .init();
+    let provider = TracerProvider::builder()
+        .with_simple_exporter(stdout::SpanExporter::default())
+        .build();
 
-    info!("info messages will be filtered out");
-    error!("only error messages will write to stdout");
-    global::shutdown_tracer_provider();
+    let tracer = provider.tracer("readme_example");
+    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+    // Compose opentelemetry with traceon
+    let subscriber = Registry::default().with(telemetry).with(traceon::builder());
+
+    tracing::subscriber::with_default(subscriber, || {
+        let root = span!(tracing::Level::TRACE, "app_start", work_units = 2);
+        let _enter = root.enter();
+
+        info!(
+            "This will log the full span data to stdout via opentelemetry \
+            along with the simplified and flattened data using traceon"
+        );
+    });
 }
 ```
 
-
 ## Performance
-This crate uses the idea originated from: [LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter) of storing fields from visited spans in a `HashMap` instead of a `BTreeMap` which is more suited for flattening fields, and results in very similar performance to the json formatter in `tracing-subcriber`:
+
+This crate uses the idea originated from: [LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter) of storing fields from visited spans in a `HashMap` instead of a `BTreeMap` which is more suited for flattening fields, and results in very similar performance to the json formatter in `tracing-subscriber`:
 
 ### logging to a sink
 
@@ -407,6 +435,6 @@ units = nanosecond or billionth of a second
 
 units = microsecond or millionth of a second
 
-### Nested spans three levels deep with concatenated fields:
+### Nested spans three levels deep with concatenated fields
 
 ![traceon: 18 nanoseconds tracing-subscriber: 22 nanoseconds](images/benchmark-async.png)
