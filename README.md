@@ -63,40 +63,38 @@ It's configurable through the builder if you want to change any of the defaults
 
 ```rust
 use traceon::{Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, TimeZone, info};
-fn main() {
-    traceon::builder()
-        // Add field with source code filename and line number e.g. src/main.rs:10
-        .file()
-        // Add field with target and module path e.g. mybinary::mymodule::submodule
-        .module()
-        // Turn off field with joined span name where the event occured e.g. parentspan::childspan
-        .span(SpanFormat::None)
-        // If the time is recorded in local system timezone or UTC
-        .timezone(TimeZone::UTC)
-        // Change the formatting of the time to RFC3339 with Seconds and Zulu
-        .time(TimeFormat::RFC3339Options(SecondsFormat::Secs, true))
-        // Change the casing of all the key names e.g. `camelCase` to `snake_case`
-        .case(Case::Snake)
-        // The characters used to concatenate field values that repeat in nested spans. Defaults to overwrite.
-        .join_fields(JoinFields::All("::"))
-        // Turn on json formatting instead of pretty output
-        .json()
-        // Change level value formatting to numbers for easier filtering
-        // trace: 10
-        // debug: 20
-        // info:  30
-        // warn:  40
-        // error: 50
-        .level(LevelFormat::Number)
-        // Put anything that implements `Write` here to redirect output
-        .writer(std::io::stderr())
-        // on() activates it globally on all threads and panic if a global subcriber is already set
-        // try_on() will return an error if a global subscriber is already set
-        // on_thread() will return a guard so the subscriber will only be active in the current scope and thread
-        .on();
+traceon::builder()
+    // Add field with source code filename and line number e.g. src/main.rs:10
+    .file()
+    // Add field with target and module path e.g. mybinary::mymodule::submodule
+    .module()
+    // Turn off field with joined span name where the event occured e.g. parentspan::childspan
+    .span(SpanFormat::None)
+    // If the time is recorded in local system timezone or UTC
+    .timezone(TimeZone::UTC)
+    // Change the formatting of the time to RFC3339 with Seconds and Zulu
+    .time(TimeFormat::RFC3339Options(SecondsFormat::Secs, true))
+    // Change the casing of all the key names e.g. `camelCase` to `snake_case`
+    .case(Case::Snake)
+    // The characters used to concatenate field values that repeat in nested spans. Defaults to overwrite.
+    .join_fields(JoinFields::All("::"))
+    // Turn on json formatting instead of pretty output
+    .json()
+    // Change level value formatting to numbers for easier filtering
+    // trace: 10
+    // debug: 20
+    // info:  30
+    // warn:  40
+    // error: 50
+    .level(LevelFormat::Number)
+    // Put anything that implements `Write` here to redirect output
+    .writer(std::io::stderr())
+    // on() activates it globally on all threads and panic if a global subcriber is already set
+    // try_on() will return an error if a global subscriber is already set
+    // on_thread() will return a guard so the subscriber will only be active in the current scope and thread
+    .on();
 
-    info!("a simple message");
-}
+info!("a simple message");
 ```
 
 Output
@@ -275,37 +273,35 @@ Often you'll be consuming different crates that implement their own traces and y
 ```rust
 use traceon::{Case, Level, event};
 
-fn main() {
-    let _guard = traceon::builder().case(Case::Pascal).on_thread();
-    event!(
-        Level::INFO,
-        message = "PascalCase",
-        PascalCase = "test",
-        camelCase = "test",
-        snake_case = "test",
-        SCREAMING_SNAKE_CASE = "test",
-    );
+let _guard = traceon::builder().case(Case::Pascal).on_thread();
+event!(
+    Level::INFO,
+    message = "PascalCase",
+    PascalCase = "test",
+    camelCase = "test",
+    snake_case = "test",
+    SCREAMING_SNAKE_CASE = "test",
+);
 
-    let _guard = traceon::builder().case(Case::Camel).on_thread();
-    event!(
-        Level::INFO,
-        message = "camelCase",
-        PascalCase = "test",
-        camelCase = "test",
-        snake_case = "test",
-        SCREAMING_SNAKE_CASE = "test",
-    );
+let _guard = traceon::builder().case(Case::Camel).on_thread();
+event!(
+    Level::INFO,
+    message = "camelCase",
+    PascalCase = "test",
+    camelCase = "test",
+    snake_case = "test",
+    SCREAMING_SNAKE_CASE = "test",
+);
 
-    let _guard = traceon::builder().case(Case::Snake).on_thread();
-    event!(
-        Level::INFO,
-        message = "snake_case",
-        PascalCase = "test",
-        camelCase = "test",
-        snake_case = "test",
-        SCREAMING_SNAKE_CASE = "test",
-    );
-}
+let _guard = traceon::builder().case(Case::Snake).on_thread();
+event!(
+    Level::INFO,
+    message = "snake_case",
+    PascalCase = "test",
+    camelCase = "test",
+    snake_case = "test",
+    SCREAMING_SNAKE_CASE = "test",
+);
 ```
 
 Output:
@@ -337,21 +333,19 @@ Output:
 ```rust
 use tracing::{Level, event};
 
-fn main() {
-    traceon::builder().on();
+traceon::builder().on();
 
-    event!(
-        Level::INFO,
-        event_example = "add field and log it without a span"
-    );
+event!(
+    Level::INFO,
+    event_example = "add field and log it without a span"
+);
 
-    let vector = vec![10, 15, 20];
-    event!(
-        Level::WARN,
-        message = "overwrite message, and debug a vector",
-        ?vector,
-    );
-}
+let vector = vec![10, 15, 20];
+event!(
+    Level::WARN,
+    message = "overwrite message, and debug a vector",
+    ?vector,
+);
 ```
 
 ```text
@@ -390,48 +384,50 @@ The writer accepts anything that implements the `Write` trait, if you want to ho
 You can also use the formatting layer with other tracing layers as you get more comfortable with the tracing ecosystem, for example to add opentelemetry:
 
 ```rust
-use opentelemetry::trace::TracerProvider as _;
-use opentelemetry_sdk::trace::TracerProvider;
-use opentelemetry_stdout as stdout;
 use tracing::{info, span};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::Registry;
+use tracing_subscriber::{Registry, layer::SubscriberExt};
+use opentelemetry::trace::TracerProvider;
+use opentelemetry_sdk::{Resource, trace::SdkTracerProvider};
+use opentelemetry_stdout as stdout;
 
-fn main() {
-    let provider = TracerProvider::builder()
-        .with_simple_exporter(stdout::SpanExporter::default())
-        .build();
+let provider = SdkTracerProvider::builder()
+    .with_simple_exporter(stdout::SpanExporter::default())
+    .build();
 
-    let tracer = provider.tracer("readme_example");
-    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-    // Compose opentelemetry with traceon
-    let subscriber = Registry::default().with(telemetry).with(traceon::builder());
+let tracer = provider.tracer("readme_example");
+let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+// Compose opentelemetry with traceon
+let subscriber = Registry::default().with(telemetry).with(traceon::builder());
 
-    tracing::subscriber::with_default(subscriber, || {
-        let root = span!(tracing::Level::TRACE, "app_start", work_units = 2);
-        let _enter = root.enter();
+tracing::subscriber::with_default(subscriber, || {
+    let root = span!(tracing::Level::TRACE, "app_start", work_units = 2);
+    let _enter = root.enter();
 
-        info!(
-            "This will log the full span data to stdout via opentelemetry \
-            along with the simplified and flattened data using traceon"
-        );
-    });
-}
+    info!(
+        "This will log the full span data to stdout via opentelemetry \
+        along with the simplified and flattened data using traceon"
+    );
+});
 ```
 
 ## Performance
 
-This crate uses the idea originated from: [LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter) of storing fields from visited spans in a `HashMap` instead of a `BTreeMap` which is more suited for flattening fields, and results in very similar performance to the json formatter in `tracing-subscriber`:
+This crate uses the idea originated from:
+[LukeMathWalker/tracing-bunyan-formatter](https://github.com/LukeMathWalker/tracing-bunyan-formatter)
+of storing fields from visited spans in a `HashMap` instead of a `BTreeMap`
+which is more suited for flattening fields. This results in not only more
+readable output, but also better performance compared to the json formatter in
+[tracing_subscriber](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/).
 
 ### logging to a sink
 
-![traceon: 720 nanoseconds tracing-subscriber: 580 nanoseconds](images/benchmark-std-sink.png)
+![traceon: 550 nanoseconds tracing-subscriber: 750 nanoseconds](images/benchmark-std-sink.png)
 
 units = nanosecond or billionth of a second
 
 ### logging to stdout
 
-![traceon: 10 microseconds tracing-subscriber: 10 microseconds](images/benchmark-std-out.png)
+![traceon: 14 microseconds tracing-subscriber: 22 microseconds](images/benchmark-std-out.png)
 
 units = microsecond or millionth of a second
 

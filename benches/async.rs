@@ -1,11 +1,11 @@
 use criterion::Criterion;
 use criterion::{criterion_group, criterion_main};
-use tracing_subscriber::{prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, prelude::*};
 
 // This is a struct that tells Criterion.rs to use the "futures" crate's current-thread executor
 use tokio::runtime::Runtime;
 
-use tracing::{info_span, Instrument};
+use tracing::{Instrument, info_span};
 
 #[tracing::instrument]
 async fn level_1(param: &str) {

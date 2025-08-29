@@ -1,5 +1,5 @@
 use criterion::black_box;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use tracing_subscriber::EnvFilter;
 
 fn bench_traceon(c: &mut Criterion) {

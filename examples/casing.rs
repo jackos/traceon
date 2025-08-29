@@ -1,4 +1,4 @@
-use traceon::{event, Case, Level};
+use traceon::{Case, Level, event};
 fn main() {
     let _guard = traceon::builder().case(Case::Pascal).on_thread();
     event!(

@@ -1,8 +1,8 @@
 [package]
 name = "traceon"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["Jack Clayton <jackos@me.com>"]
-edition = "2021"
+edition = "2024"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/jackos/traceon"
 documentation = "https://docs.rs/traceon"
@@ -28,19 +28,19 @@ default-features = false
 features = ["registry", "fmt", "env-filter"]
 
 [dev-dependencies]
-claims = "0.7.1"
-once_cell = "1.19.0"
-tokio = { version = "1.36.0", features = ["full"] }
-criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
-tracing-attributes = "0.1.27"
-tracing-opentelemetry = "0.23.0"
+claims = "0.8.0"
+once_cell = "1.21.0"
+tokio = { version = "1.47.1", features = ["full"] }
+criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
+tracing-attributes = "0.1.30"
+tracing-opentelemetry = "0.31.0"
 tracing-appender = "0.2.3"
-opentelemetry-otlp = { version = "0.15.0", features = ["tonic"] }
-opentelemetry = "0.22.0"
-opentelemetry_sdk = "0.22.1"
-opentelemetry-stdout = { version = "0.3.0", features = ["trace"] }
-tracing = "0.1"
-tracing-subscriber = "0.3"
+opentelemetry-otlp = { version = "0.30.0", features = ["tonic"] }
+opentelemetry = "0.30.0"
+opentelemetry_sdk = "0.30.0"
+opentelemetry-stdout = { version = "0.30.0", features = ["trace"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["fmt", "std", "json"] }
 
 
 [[bench]]

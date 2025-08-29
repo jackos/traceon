@@ -1,5 +1,5 @@
 use traceon::{
-    info, Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, TimeZone,
+    Case, JoinFields, LevelFormat, SecondsFormat, SpanFormat, TimeFormat, TimeZone, info,
 };
 
 fn main() {

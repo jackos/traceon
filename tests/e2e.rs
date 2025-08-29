@@ -1,11 +1,11 @@
 use claims::assert_some_eq;
 use once_cell::sync::Lazy;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tracing::{info, span, Level};
-use tracing_subscriber::layer::SubscriberExt;
+use tracing::{Level, info, span};
 use tracing_subscriber::Registry;
+use tracing_subscriber::layer::SubscriberExt;
 
 /// Tests have to be run on a single thread because we are re-using the same buffer for
 /// all of them.

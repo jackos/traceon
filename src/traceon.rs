@@ -11,13 +11,13 @@ use std::{
 };
 use tracing::Level;
 use tracing::{
+    Event, Id, Subscriber,
     field::{Field, Visit},
     span::Attributes,
-    Event, Id, Subscriber,
 };
 use tracing_subscriber::{
-    layer::{Context, SubscriberExt},
     EnvFilter, Layer, Registry,
+    layer::{Context, SubscriberExt},
 };
 
 /// Private struct to initialize formatting and storage layers
@@ -166,7 +166,6 @@ where
 
 /// Default values used for the builder
 impl Default for Traceon {
-    #[must_use]
     fn default() -> Traceon {
         Traceon {
             json: false,
@@ -205,10 +204,10 @@ impl Traceon {
     /// use traceon::SpanFormat;
     ///
     /// traceon::builder().span(SpanFormat::Join(">")).on();
-
+    ///
     /// let _span = tracing::info_span!("level_1").entered();
     /// tracing::info!("span level 1");
-
+    ///
     /// let _span = tracing::info_span!("level_2").entered();
     /// tracing::info!("span level 2");
     /// ```
@@ -539,7 +538,7 @@ impl Traceon {
 
             if self.json {
                 map_serializer.serialize_entry(&key, value)?;
-            } else if key.to_ascii_lowercase() != "message" {
+            } else if !key.eq_ignore_ascii_case("message") {
                 fields.push((key.to_string(), clean_json_value(value)));
             }
         }
@@ -558,7 +557,7 @@ impl Traceon {
 
                     if self.json {
                         map_serializer.serialize_entry(&key, value)?;
-                    } else if key.to_ascii_lowercase() != "message" {
+                    } else if !key.eq_ignore_ascii_case("message") {
                         fields.push((key.to_string(), clean_json_value(value)));
                     }
                 }
@@ -621,28 +620,27 @@ where
                 .get_mut::<JsonStorage>()
                 .map(|v| v.to_owned())
                 .unwrap_or_default();
-            if self.span_format != SpanFormat::None {
-                if let Some(orig) = storage
+            if self.span_format != SpanFormat::None
+                && let Some(orig) = storage
                     .values
                     .insert(span_key, serde_json::Value::from(span.metadata().name()))
-                {
-                    match self.span_format {
-                        SpanFormat::Overwrite => (),
-                        SpanFormat::Join(concat) => {
-                            storage.values.insert(
-                                span_key,
-                                serde_json::Value::from(format!(
-                                    "{}{}{}",
-                                    orig.as_str().unwrap_or(""),
-                                    concat,
-                                    span.metadata().name()
-                                )),
-                            );
-                        }
-                        SpanFormat::None => (),
+            {
+                match self.span_format {
+                    SpanFormat::Overwrite => (),
+                    SpanFormat::Join(concat) => {
+                        storage.values.insert(
+                            span_key,
+                            serde_json::Value::from(format!(
+                                "{}{}{}",
+                                orig.as_str().unwrap_or(""),
+                                concat,
+                                span.metadata().name()
+                            )),
+                        );
                     }
-                };
-            }
+                    SpanFormat::None => (),
+                }
+            };
             storage
         } else {
             let mut storage = JsonStorage::new(self.join_fields, self.span_format);
@@ -754,7 +752,7 @@ impl Visit for JsonStorage<'_> {
             .values
             .insert(field.name(), serde_json::Value::from(value))
         {
-            if field.name().to_ascii_lowercase() == "span" {
+            if field.name().eq_ignore_ascii_case("span") {
                 if let SpanFormat::Join(chars) = self.span_format {
                     let orig = orig.as_str().unwrap_or("");
                     let new = format!("{orig}{chars}{value}");

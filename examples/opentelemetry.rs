@@ -1,20 +1,18 @@
-use opentelemetry::trace::TracerProvider as _;
-use opentelemetry_sdk::trace::TracerProvider;
+use opentelemetry::trace::TracerProvider;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use opentelemetry_stdout as stdout;
 use tracing::{info, span};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::Registry;
+use tracing_subscriber::{Registry, layer::SubscriberExt};
 
 fn main() {
-    // Create a new OpenTelemetry trace pipeline that prints to stdout
-    let provider = TracerProvider::builder()
-        .with_simple_exporter(stdout::SpanExporter::default())
+    // Build provider with batch processing and resource configuration
+    let provider = SdkTracerProvider::builder()
+        .with_batch_exporter(stdout::SpanExporter::default())
         .build();
-    let tracer = provider.tracer("readme_example");
 
     // Create a tracing layer with the configured tracer
+    let tracer = provider.tracer("traceon_example");
     let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-
     // Compose traceon and opentelemetry together
     let subscriber = Registry::default().with(telemetry).with(traceon::builder());
 
@@ -25,8 +23,15 @@ fn main() {
         let _enter = root.enter();
 
         info!(
-            "This wll generate an event for the entered span using opentelemetry \
+            "This will generate an event for the entered span using opentelemetry \
             and also log flattened data via traceon."
         );
+
+        // Nested span example
+        {
+            let child = span!(tracing::Level::INFO, "processing", items = 5);
+            let _enter = child.enter();
+            info!("Processing items in nested span");
+        }
     });
 }

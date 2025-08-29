@@ -1,4 +1,4 @@
-use traceon::{info_span, instrument, Instrument};
+use traceon::{Instrument, info_span, instrument};
 
 #[instrument]
 async fn span_one(a: &str, b: &str) {

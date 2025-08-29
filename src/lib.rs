@@ -6,8 +6,8 @@ pub use crate::traceon::{Case, JoinFields, LevelFormat, SpanFormat, TimeFormat, 
 pub use chrono::SecondsFormat;
 use tracing::subscriber::DefaultGuard;
 pub use tracing::{
-    debug, debug_span, error, error_span, event, info, info_span, instrument, trace, trace_span,
-    warn, warn_span, Instrument, Level,
+    Instrument, Level, debug, debug_span, error, error_span, event, info, info_span, instrument,
+    trace, trace_span, warn, warn_span,
 };
 
 /** Returns a builder that can be configured before being turned on, or used as a layer for a subscriber.

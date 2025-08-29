@@ -1,4 +1,4 @@
-use tracing_subscriber::{prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, prelude::*};
 
 fn main() {
     tracing_subscriber::registry()
